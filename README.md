@@ -168,7 +168,9 @@ brain runs get run_1234567890abcdef --wait 25
 
 Results include revisions, pagination, and source URLs. Pin related reads with `--revision <sha>`.
 Search is lexical. Follow `nextOffset` and `nextLine`, and inspect per-file errors before concluding
-that a result is complete. `knowledge read-many --file ranges.json` accepts up to eight
+that a result is complete. For grep, carry both `nextOffset` and `nextMatchOffset` when present. The
+service supports Sandbox and storage API retrieval; local development works without a Sandbox
+binding. `knowledge read-many --file ranges.json` accepts up to eight
 `{"path":"file.md","startLine":1,"limit":200}` objects in an array.
 
 Recording invokes the service's writing model, which selects files and commits validated knowledge.
@@ -233,6 +235,11 @@ context. A write followed by an unsuccessful wait retains the submitted run ID i
 CLI does not automatically replay writes. Exit codes are `0` for an accepted operation (including a
 running recording), `2` for input/configuration errors, `3` for authentication, `4` for permission
 denial, `5` for conflicts, and `1` for other failures. Use `--pretty` for indented JSON.
+
+An `io`, `network`, or `protocol` error means the command failed before returning usable knowledge.
+Resolve the technical failure before drawing conclusions from search. Sandboxed hosts must allow
+authenticated commands to access the global credential directory and its lock as well as the service
+connection. Use the host's permission flow while preserving private credential permissions.
 
 [Usage](https://github.com/jdx/usage) is the source for commands, arguments, help, and completions:
 

@@ -31,6 +31,7 @@ struct State {
     fail_verification: bool,
     wait_fails: bool,
     revoked: bool,
+    response_encoding: Option<&'static str>,
 }
 struct Fixture {
     origin: String,
@@ -174,12 +175,38 @@ impl Fixture {
                 } else {
                     (404, json!({"error": "not found"}))
                 };
-                request
-                    .respond(
-                        tiny_http::Response::from_string(value.to_string())
-                            .with_status_code(status),
-                    )
-                    .unwrap();
+                let body = value.to_string().into_bytes();
+                let body = match state.response_encoding {
+                    Some("br") => {
+                        let mut compressed = Vec::new();
+                        {
+                            let mut writer =
+                                brotli::CompressorWriter::new(&mut compressed, 4096, 4, 22);
+                            writer.write_all(&body).unwrap();
+                        }
+                        compressed
+                    }
+                    Some("gzip") => {
+                        let mut writer = flate2::write::GzEncoder::new(
+                            Vec::new(),
+                            flate2::Compression::default(),
+                        );
+                        writer.write_all(&body).unwrap();
+                        writer.finish().unwrap()
+                    }
+                    _ => body,
+                };
+                let mut response = tiny_http::Response::from_data(body)
+                    .with_status_code(status)
+                    .with_header(
+                        tiny_http::Header::from_bytes("Content-Type", "application/json").unwrap(),
+                    );
+                if let Some(encoding) = state.response_encoding {
+                    response.add_header(
+                        tiny_http::Header::from_bytes("Content-Encoding", encoding).unwrap(),
+                    );
+                }
+                request.respond(response).unwrap();
             }
         });
         let root = tempfile::tempdir().unwrap();
@@ -277,6 +304,33 @@ fn decode(output: Output) -> (i32, Value) {
         )
     });
     (output.status.code().unwrap(), value)
+}
+
+#[test]
+fn compressed_responses_support_search_login_refresh_and_service_errors() {
+    for encoding in ["br", "gzip"] {
+        let fixture = Fixture::new();
+        fixture.login(&[]);
+        fixture.state.lock().unwrap().response_encoding = Some(encoding);
+        let (code, search) = fixture.run(&["search", "profit"]);
+        assert_eq!(code, 0, "{encoding}: {search}");
+        assert_eq!(search["data"]["results"][0]["snippet"], "Fixture policy");
+        assert_eq!(fixture.state.lock().unwrap().refreshes, 1);
+        fixture.state.lock().unwrap().deny_membership = true;
+        let (code, denied) = fixture.run(&["whoami"]);
+        assert_eq!(code, 4, "{encoding}: {denied}");
+        assert_eq!(denied["error"]["status"], 403);
+        assert_eq!(denied["error"]["code"], "permission_denied");
+        assert_eq!(
+            denied["error"]["message"],
+            "Access changed during selection"
+        );
+        let login_fixture = Fixture::new();
+        login_fixture.state.lock().unwrap().response_encoding = Some(encoding);
+        let login = login_fixture.login(&[]);
+        assert_eq!(login["data"]["selection"]["selected"], true);
+        assert_eq!(login_fixture.state.lock().unwrap().refreshes, 1);
+    }
 }
 
 #[test]

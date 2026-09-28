@@ -16,8 +16,9 @@ PKCE, invalid state, private credential storage, refresh, revocation, JSON outpu
 login selection, opt-out, existing and concurrent selection preservation, discovery and verification
 failures, failed-switch rollback, selection from the current working directory, request identity,
 and one-time secret files. Fixtures contain synthetic identities and knowledge and do not call a
-model or external storage. Skill installation is tested independently in the Brain skills
-repository.
+model or external storage. Compressed-response fixtures cover Brotli and gzip across OAuth login,
+refresh, search results, and service permission errors. Skill installation is tested independently
+in the Brain skills repository.
 
 Installer tests replace development and release fixtures in the same temporary directory, preserve
 the previous executable when a replacement fails validation, and cover existing symlinks and paths
@@ -34,7 +35,9 @@ mise run test-cli-api
 These workerd tests exercise real OAuth registration, consent, exchange and revocation, current-role
 changes, creation retries, retrieval, recording receipts, invitation roles, stale ownership, service
 suspension, and existing MCP regression coverage. External storage and model boundaries are
-substituted. This is separate from the Rust fixture suite; neither claims a live provider test.
+substituted. This is separate from the Rust fixture suite; neither claims a live provider test. The
+service's repository tests also exercise direct retrieval without a Sandbox binding, including file
+and match pagination, partial failures, pinned ranges, and the selected Sandbox path.
 
 ## Try your own local Brain
 

@@ -4,6 +4,14 @@ The CLI sends ordinary HTTP requests to `/app/api/cli`. It does not initialize M
 or execute remote JavaScript. The service adapter dispatches registered product operations through
 the same `organizationRequest` authorization and handlers used by browser and MCP requests.
 
+OAuth and API requests share an HTTP client with Brotli and gzip response decoding. Local proxies
+can compress JSON responses; parsing the compressed bytes as JSON would turn successful requests and
+service errors alike into protocol failures.
+
+Search, grep, and ranged reads use the shared retrieval route. The service selects its configured
+backend, including the storage API used by local development without Sandbox. The CLI follows the
+returned cursors and revision without choosing a backend itself.
+
 ## Authentication and authority
 
 Login uses dynamic client registration, browser email sign-in and consent, authorization code with
@@ -23,6 +31,10 @@ keep authorization and tokens at the configured origin. HTTP origins are allowed
 other origins require HTTPS. Tokens never appear in command arguments, project configuration, or
 normal output. Unix credential directories are `0700` and files are `0600`. Native OS keychain
 storage is a future option; Windows credential permissions are not yet a tested target.
+
+Authenticated commands need local permission to access the credential directory and its lock,
+including read-only searches. A sandbox denial returns an `io` error with a permission hint; the
+host's permission flow grants access without changing credential storage or file permissions.
 
 ## Selection and retries
 

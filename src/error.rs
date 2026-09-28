@@ -37,8 +37,15 @@ impl Error {
 }
 
 impl From<std::io::Error> for Error {
-    fn from(_: std::io::Error) -> Self {
-        Self::new("io", "Could not access a required local file or socket")
+    fn from(error: std::io::Error) -> Self {
+        Self::new(
+            "io",
+            if error.kind() == std::io::ErrorKind::PermissionDenied {
+                "Local file or socket access was denied. Use the host's permission flow to allow access to the required files and service connection."
+            } else {
+                "Could not access a required local file or socket"
+            },
+        )
     }
 }
 impl From<serde_json::Error> for Error {
@@ -56,5 +63,26 @@ impl From<reqwest::Error> for Error {
                 "Request failed. Check the service origin and connection. Preserve retry identity after an uncertain write."
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Error;
+
+    #[test]
+    fn local_permission_errors_offer_recovery_without_exposing_internal_details() {
+        let error = Error::from(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "synthetic-private-detail",
+        ));
+        assert_eq!(error.code, "io");
+        assert_ne!(error.exit_code(), 0);
+        assert!(error.message.contains("permission"));
+        assert!(
+            !serde_json::to_string(&error)
+                .unwrap()
+                .contains("synthetic-private-detail")
+        );
     }
 }
