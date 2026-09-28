@@ -193,14 +193,18 @@ impl Fixture {
         }
     }
     fn command(&self) -> Command {
+        let mut command = self.local_command();
+        command.args([
+            "--project",
+            self.root.path().join("project").to_str().unwrap(),
+        ]);
+        command
+    }
+    fn local_command(&self) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_brain"));
         command
-            .args([
-                "--origin",
-                &self.origin,
-                "--project",
-                self.root.path().join("project").to_str().unwrap(),
-            ])
+            .args(["--origin", &self.origin])
+            .current_dir(self.root.path().join("project"))
             .env("BRAIN_HOME", self.root.path().join("auth"))
             .env_remove("BRAIN_ORIGIN")
             .env("NO_COLOR", "1");
@@ -273,6 +277,73 @@ fn decode(output: Output) -> (i32, Value) {
         )
     });
     (output.status.code().unwrap(), value)
+}
+
+#[test]
+fn plain_commands_use_the_working_directory_selection_and_never_a_global_default() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    let local = decode(fixture.local_command().arg("config").output().unwrap());
+    assert_eq!(local.0, 0);
+    assert_eq!(local.1["data"]["brain_id"], FIRST);
+    let search = decode(
+        fixture
+            .local_command()
+            .args(["search", "policy"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(search.0, 0);
+    assert_eq!(search.1["context"]["brain_id"], FIRST);
+    let other = fixture.root.path().join("other");
+    fs::create_dir_all(other.join(".brain")).unwrap();
+    fs::write(
+        other.join(".brain/config.toml"),
+        format!("brain_id = '{SECOND}'\n"),
+    )
+    .unwrap();
+    let search = decode(
+        fixture
+            .local_command()
+            .current_dir(&other)
+            .args(["search", "policy"])
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(search.0, 0);
+    assert_eq!(search.1["context"]["brain_id"], SECOND);
+    let unconfigured = decode(
+        fixture
+            .local_command()
+            .current_dir(fixture.root.path())
+            .arg("config")
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(unconfigured.0, 0);
+    assert_eq!(unconfigured.1["data"]["brain_id"], Value::Null);
+    assert_eq!(
+        decode(
+            fixture
+                .local_command()
+                .current_dir(fixture.root.path())
+                .args(["search", "policy"])
+                .output()
+                .unwrap()
+        )
+        .0,
+        2
+    );
+    assert!(!fixture.root.path().join(".brain").exists());
+    assert!(
+        fs::read_dir(fixture.root.path().join("auth"))
+            .unwrap()
+            .all(|entry| entry
+                .unwrap()
+                .path()
+                .extension()
+                .is_none_or(|extension| extension != "toml"))
+    );
 }
 
 #[test]

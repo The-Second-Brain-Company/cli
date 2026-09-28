@@ -11,11 +11,16 @@ run = "cargo build --locked"
 
 [tasks.test]
 dir = "{{config_root}}"
-run = ["cargo test --locked", "cargo clippy --locked --all-targets -- -D warnings"]
+run = [
+  "cargo test --locked",
+  "cargo clippy --locked --all-targets -- -D warnings",
+  "node --test scripts/*.test.mjs",
+]
 
 [tasks.install]
+description = "Build current working files and replace brain in BIN_DIR or ~/.local/bin"
 dir = "{{config_root}}"
-run = "cargo install --path . --locked --root .local"
+run = "node scripts/install-dev.mjs"
 
 [tasks.brain]
 dir = "{{config_root}}"

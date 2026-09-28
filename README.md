@@ -6,8 +6,9 @@ Search shared knowledge, record what matters, switch Brains, and manage access t
 CLI. Portable skills teach an agent how to choose the right Brain, cite sources, finish onboarding,
 and recover from an uncertain save.
 
-**Local evaluation preview.** Build and install from this checkout. No crate, binary release,
-marketplace, or npm package is published. The existing MCP and plugin integrations remain available.
+**Local evaluation preview.** Build and install from the files in this directory. No crate, binary
+release, marketplace, or npm package is published. The existing MCP and plugin integrations remain
+available.
 
 ## Quick start
 
@@ -19,17 +20,34 @@ mise trust
 mise install
 mise run test
 mise run install
-export PATH="$PWD/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 brain --help
 ```
 
-`mise run install` builds the local Rust package and places `brain` in `.local/bin`. It does not
-publish or download a released Brain binary. Cargo downloads the locked third-party dependencies on
-the first build. Subsequent builds use [mr-boxington](https://github.com/jdx/mr-boxington) through
-mise's Rust integration. The tool versions are pinned in `mise.toml`.
+`mise run install` builds the files in this existing repository directory, including saved,
+uncommitted changes, in release mode and installs `brain` at `~/.local/bin/brain`. Rerun it after
+editing the CLI. It copies the built executable, so changes take effect after reinstalling. Cargo
+downloads the locked third-party dependencies on the first build. Subsequent builds use
+[mr-boxington](https://github.com/jdx/mr-boxington) through mise's Rust integration. The tool
+versions are pinned in `mise.toml`.
+
+`~/.local/bin/brain` is the shared installation location for development builds and future
+production releases. Either installer replaces the current binary there; no uninstall or Cargo
+registration is needed. The installer verifies the replacement before moving it into place.
+Authentication and project configuration live elsewhere and are preserved. Set `BIN_DIR` to use a
+different directory:
+
+```sh
+BIN_DIR="$PWD/.local/bin" mise run install
+```
+
+Use the same `BIN_DIR` for both installers when switching versions. If an earlier installation is
+first on PATH, the installer reports it. Keep the shared installation directory first on the PATH
+used by your terminal and agent. From the full Second Brain repository root, `mise run install-cli`
+runs this same development installation.
 
 After `mise trust` and `mise install`, you can also run `bash scripts/install.sh` from this
-checkout. The script belongs to this repository. The future public `/install-cli` entry point will
+directory. The script belongs to this repository. The future public `/install-cli` entry point will
 redirect to its raw GitHub URL once the CLI mirror and public distribution are configured. During
 local evaluation, piping the script requires `BRAIN_CLI_SOURCE_DIR` to point at an existing CLI
 checkout:
@@ -37,6 +55,10 @@ checkout:
 ```sh
 cat scripts/install.sh | BRAIN_CLI_SOURCE_DIR="$PWD" bash
 ```
+
+To install an executable already built on disk, run
+`bash scripts/install.sh --from-file /absolute/path/to/brain`. This uses the same replacement step
+without rebuilding. Public release downloads remain deferred during local evaluation.
 
 Start a Second Brain service with CLI support. In the full Second Brain checkout, run `mise run dev`
 from its root, following its existing local service setup. The CLI defaults to
@@ -46,9 +68,9 @@ to select another compatible service. This preview's backend adapter has not bee
 ```sh
 brain login
 brain brains list
-brain --project /path/to/your/project use org_1234567890abcdef
-brain --project /path/to/your/project whoami
-brain --project /path/to/your/project search "release decisions"
+brain use org_1234567890abcdef
+brain whoami
+brain search "release decisions"
 ```
 
 Use an ID returned by `brains list`. Login opens email sign-in and browser consent. It requests the
@@ -66,36 +88,37 @@ boundaries.
 
 ## Add the skill
 
-The agent skills live in an independent Brain skills repository with its own installer. From a
-checkout of that repository, install into your evaluation project:
+The agent skills live in an independent Brain skills repository with its own installer. From that
+repository directory, install them globally for your user:
 
 ```sh
 mise trust
 mise install
-mise run install -- --project /path/to/your/project
+mise run install
 ```
 
-This copies its `brain/` skill to the project's `.agents/skills/brain` and adds a short `AGENTS.md`
-pointer while retaining existing instructions. Reinstall with `--replace` after reviewing a skill
-change. The CLI repository builds and installs independently of that checkout.
+This copies the current skill, references, and logo to `~/.agents/skills/brain` for Codex and
+`~/.claude/skills/brain` for Claude Code. It works from any directory without project instruction
+files. Update both copies with `mise run install -- --replace` after editing the skill. From the
+full Second Brain repository root, use `mise run install-cli-skills -- --replace`.
 
-Codex discovers `.agents/skills`. Current Claude Code can follow the `AGENTS.md` pointer with its
-built-in AGENTS support enabled. The source package needs no `.claude` folder. A Claude setup that
-loads only `CLAUDE.md` can import `AGENTS.md`, or load `.agents/skills/brain/SKILL.md` explicitly.
-See the skills repository's README for supported environments.
+Project-only skill installation remains available with `--project /path/to/your/project`; see the
+skills repository's README for that fallback and supported environments. Both repositories build,
+install, and test independently.
 
-Make this CLI checkout's `.local/bin` available on the agent process's PATH, or give it the absolute
-path to `brain`. Then ask:
+Make `~/.local/bin` (or your `BIN_DIR`) available on the agent process's PATH, or give it the
+absolute path to `brain`. Then ask:
 
 > Use the Brain CLI to find our release decisions and cite the sources.
 
-> Create a Brain called Field Notes, select it for this project, and help me onboard it.
+> Create a Brain called Field Notes, select it, and help me onboard it.
 
 > Remember that launch approval belongs to the product lead.
 
-## Project selection
+## Brain selection
 
-Each project chooses a Brain in `.brain/config.toml`:
+The CLI and skills are installed globally for your user. Brain selection stays in the current
+directory's `.brain/config.toml`. Plain `brain ...` commands automatically read and write this file:
 
 ```toml
 brain_id = "org_1234567890abcdef"
@@ -104,21 +127,22 @@ brain_id = "org_1234567890abcdef"
 `brain use <id>` verifies access, atomically writes the file, reads it back, and verifies again. A
 failure restores the previous selection. `brain config` shows the local configuration.
 
-- `--project` chooses the directory; the default is the current directory. Parent directories are
-  not searched, so a neighboring project cannot silently select a Brain.
+- `--project` targets a different directory; the default is the current directory. There is no
+  global default Brain. Parent directories are not searched, so a neighboring project cannot
+  silently select a Brain.
 - `--brain <id>` overrides the selection for one command without changing the file.
 - Login selects the account's only Brain when the project has no configuration and access verifies
   successfully. Use `brain login --no-select` to opt out. Existing selections are preserved; zero or
   multiple memberships require a choice with `brain use`. An explicit `--brain` on login also leaves
-  project configuration unchanged.
+  saved configuration unchanged.
 - Login reports its selection outcome in `data.selection`. A discovery or verification failure
   leaves you signed in and reports `selected: false` with an error; select a Brain later with
   `brain use`. Existing invalid TOML or JSON-only configuration is preserved for explicit recovery.
 - Creation returns a new Brain but leaves selection unchanged. Run `brain use <new-id>` after
   creation succeeds. This keeps creation retries attached to their original request context.
 - JSON selection is deferred. If only `.brain/config.json` exists, select its intended Brain with
-  `brain use`; the JSON file is preserved. When both exist, this CLI uses TOML and MCP uses JSON.
-  Keep them aligned intentionally while evaluating both transports.
+  `brain --project /path/to/project use <id>`; the JSON file is preserved. When both exist, this CLI
+  uses TOML and MCP uses JSON. Keep them aligned intentionally while evaluating both transports.
 
 Account credentials live in `$BRAIN_HOME`, `$XDG_CONFIG_HOME/second-brain`, or
 `~/.config/second-brain`, in that order. Set `BRAIN_HOME` to a private directory outside projects
@@ -182,9 +206,10 @@ brain runs cancel run_1234567890abcdef
 Invitations default to Read only and send email outside local development. For a local invitation,
 add `--secret-file /private/path/invitation.json` to preserve its one-time acceptance link. Without
 that option the CLI discards the development link. One-time links and Git tokens never appear on
-stdout. Secret destinations must be new absolute paths outside the selected project; their parent
-directories must already exist. Only the current Owner can transfer ownership. Operator suspension,
-limits, deletion, and recovery remain in the private administration console.
+stdout. Secret destinations must be new absolute paths outside the working directory (or the
+explicit `--project` directory); their parent directories must already exist. Only the current Owner
+can transfer ownership. Operator suspension, limits, deletion, and recovery remain in the private
+administration console.
 
 ## Built for agents
 

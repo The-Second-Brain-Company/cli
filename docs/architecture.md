@@ -26,16 +26,19 @@ storage is a future option; Windows credential permissions are not yet a tested 
 
 ## Selection and retries
 
-The selected Brain is a project-local immutable Organization ID. TOML is read from exactly the
-chosen project directory. An explicit flag overrides it for one invocation. A missing, malformed, or
-JSON-only selection stops knowledge operations. No existing project files are migrated or rewritten
-on discovery. `use` performs verified atomic replacement and rollback under a project lock.
+The selected Brain is a project-local immutable Organization ID. Commands automatically use the
+current directory's `.brain/config.toml`; `--project` targets another directory. There is no global
+selection. An explicit `--brain` overrides the selection for one invocation. A missing, malformed,
+or JSON-only selection stops knowledge operations. No existing project files are migrated or
+rewritten on discovery. `use` performs verified atomic replacement and rollback under a project
+lock.
 
-Creation and recording require caller-owned retry IDs. Creating a Brain does not switch the project
-automatically. The agent skill performs the subsequent verified switch after creation is confirmed.
-This preserves the original assertion and request identity across lost responses. Running records
-continue through bounded waits, and successful process execution is distinct from a saved receipt.
-Exact edits retain optimistic revision checks; the CLI never silently merges or retries them.
+Creation and recording require caller-owned retry IDs. Creating a Brain does not switch the
+selection automatically. The agent skill performs the subsequent verified switch after creation is
+confirmed. This preserves the original assertion and request identity across lost responses. Running
+records continue through bounded waits, and successful process execution is distinct from a saved
+receipt. Exact edits retain optimistic revision checks; the CLI never silently merges or retries
+them.
 
 After successful authentication, login selects the sole account membership if the project is
 unconfigured. `login --no-select` or a per-command `--brain` skips this step. Existing selections
@@ -45,6 +48,13 @@ returned in `data.selection` while `signed_in` remains true. Zero or multiple me
 project unconfigured. Invalid or JSON-only configuration requires explicit recovery with `use`.
 
 ## Local evaluation boundary
+
+Development installation builds the current working files with the pinned Cargo toolchain, reads the
+executable path from Cargo's build output, and passes it to `scripts/install.sh --from-file`. That
+shared installation step validates a temporary executable and atomically replaces
+`~/.local/bin/brain`, or `BIN_DIR/brain` when configured. The future production download path must
+use the same destination and replacement step so either version can replace the other. Binary
+installation keeps credentials and project selections intact.
 
 The service adapter adds transport aliases for current operations. It adds no role, management
 scope, data store, migration, or public operator API. Browser and MCP results keep their existing
