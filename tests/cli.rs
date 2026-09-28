@@ -22,6 +22,10 @@ const RUN: &str = "run_1111111111111111";
 struct State {
     requests: Vec<(String, String, Value)>,
     challenge: String,
+    organizations: Vec<Value>,
+    fail_discovery: bool,
+    deny_membership: bool,
+    select_during_discovery: Option<std::path::PathBuf>,
     refreshes: usize,
     verification_count: usize,
     fail_verification: bool,
@@ -42,7 +46,10 @@ impl Fixture {
             "http://second-brain.localhost:{}",
             server.server_addr().to_ip().unwrap().port()
         );
-        let state = Arc::new(Mutex::new(State::default()));
+        let state = Arc::new(Mutex::new(State {
+            organizations: vec![json!({"id": FIRST, "name": "Fixture", "role": "owner"})],
+            ..State::default()
+        }));
         let stop = Arc::new(AtomicBool::new(false));
         let (shared, stopping, service) = (state.clone(), stop.clone(), origin.clone());
         let worker = thread::spawn(move || {
@@ -100,7 +107,10 @@ impl Fixture {
                     );
                     if path.ends_with("/membership") {
                         state.verification_count += 1;
-                        if state.fail_verification && state.verification_count.is_multiple_of(2) {
+                        if state.deny_membership
+                            || (state.fail_verification
+                                && state.verification_count.is_multiple_of(2))
+                        {
                             (403, json!({"error": "Access changed during selection"}))
                         } else {
                             let id = if path.contains(SECOND) { SECOND } else { FIRST };
@@ -148,6 +158,16 @@ impl Fixture {
                             200,
                             json!({"organization": {"id": SECOND, "name": input["name"]}}),
                         )
+                    } else if path.ends_with("/brains") {
+                        if let Some(path) = state.select_during_discovery.take() {
+                            fs::create_dir_all(path.parent().unwrap()).unwrap();
+                            fs::write(path, format!("brain_id = '{SECOND}'\n")).unwrap();
+                        }
+                        if state.fail_discovery {
+                            (503, json!({"error": "Brain discovery unavailable"}))
+                        } else {
+                            (200, json!({"organizations": state.organizations}))
+                        }
                     } else {
                         (200, json!({"completed": true}))
                     }
@@ -190,10 +210,11 @@ impl Fixture {
         let output = self.command().args(args).output().unwrap();
         decode(output)
     }
-    fn login(&self) {
+    fn login(&self, args: &[&str]) -> Value {
         let mut child = self
             .command()
             .args(["login", "--no-browser", "--timeout", "10"])
+            .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -232,7 +253,10 @@ impl Fixture {
         );
         let output = child.wait_with_output().unwrap();
         assert!(!String::from_utf8_lossy(&output.stdout).contains("synthetic-access-token"));
-        assert_eq!(decode(output).0, 0);
+        let (code, result) = decode(output);
+        assert_eq!(code, 0, "{result}");
+        assert_eq!(result["data"]["signed_in"], true);
+        result
     }
 }
 impl Drop for Fixture {
@@ -252,9 +276,164 @@ fn decode(output: Output) -> (i32, Value) {
 }
 
 #[test]
+fn login_selects_the_only_brain_and_preserves_existing_selection_on_relogin() {
+    let fixture = Fixture::new();
+    let result = fixture.login(&[]);
+    assert_eq!(result["data"]["selection"]["selected"], true);
+    assert_eq!(
+        result["data"]["selection"]["identity"]["organization"]["id"],
+        FIRST
+    );
+    assert_eq!(result["context"]["brain_id"], FIRST);
+    assert_eq!(fixture.run(&["config"]).1["data"]["brain_id"], FIRST);
+    assert_eq!(fixture.state.lock().unwrap().verification_count, 2);
+    assert_eq!(fixture.run(&["search", "policy"]).0, 0);
+
+    assert_eq!(fixture.run(&["use", SECOND]).0, 0);
+    let path = fixture.root.path().join("project/.brain/config.toml");
+    let original = fs::read(&path).unwrap();
+    fixture.state.lock().unwrap().requests.clear();
+    let result = fixture.login(&[]);
+    assert_eq!(result["data"]["selection"]["reason"], "already_selected");
+    assert_eq!(result["context"]["brain_id"], SECOND);
+    assert_eq!(fs::read(path).unwrap(), original);
+    assert!(
+        !fixture
+            .state
+            .lock()
+            .unwrap()
+            .requests
+            .iter()
+            .any(|(_, path, _)| path.starts_with("/app/api/cli/"))
+    );
+}
+
+#[test]
+fn login_opt_out_and_invocation_override_leave_project_unconfigured() {
+    for (args, reason, brain) in [
+        (vec!["--no-select"], "disabled", Value::Null),
+        (vec!["--brain", SECOND], "brain_override", json!(SECOND)),
+    ] {
+        let fixture = Fixture::new();
+        let result = fixture.login(&args);
+        assert_eq!(result["data"]["selection"]["selected"], false);
+        assert_eq!(result["data"]["selection"]["reason"], reason);
+        assert_eq!(result["context"]["brain_id"], brain);
+        assert!(!fixture.root.path().join("project/.brain").exists());
+        assert!(
+            !fixture
+                .state
+                .lock()
+                .unwrap()
+                .requests
+                .iter()
+                .any(|(_, path, _)| path.starts_with("/app/api/cli/"))
+        );
+        assert_eq!(fixture.run(&["brains", "list"]).0, 0);
+    }
+}
+
+#[test]
+fn login_requires_a_choice_with_zero_or_multiple_brains() {
+    for (organizations, reason) in [
+        (vec![], "no_brains"),
+        (
+            vec![json!({"id": FIRST}), json!({"id": SECOND})],
+            "multiple_brains",
+        ),
+    ] {
+        let fixture = Fixture::new();
+        fixture.state.lock().unwrap().organizations = organizations;
+        let result = fixture.login(&[]);
+        assert_eq!(result["data"]["selection"]["selected"], false);
+        assert_eq!(result["data"]["selection"]["reason"], reason);
+        assert_eq!(result["context"]["brain_id"], Value::Null);
+        assert!(!fixture.root.path().join("project/.brain").exists());
+        assert_eq!(fixture.state.lock().unwrap().verification_count, 0);
+        assert_eq!(fixture.run(&["search", "policy"]).0, 2);
+    }
+}
+
+#[test]
+fn login_keeps_authentication_when_discovery_or_selection_fails() {
+    for (discovery, denied, rollback, code, checks) in [
+        (true, false, false, "service", 0),
+        (false, true, false, "permission_denied", 1),
+        (false, false, true, "permission_denied", 2),
+    ] {
+        let fixture = Fixture::new();
+        {
+            let mut state = fixture.state.lock().unwrap();
+            state.fail_discovery = discovery;
+            state.deny_membership = denied;
+            state.fail_verification = rollback;
+        }
+        let result = fixture.login(&[]);
+        assert_eq!(result["data"]["selection"]["selected"], false);
+        assert_eq!(result["data"]["selection"]["reason"], "failed");
+        assert_eq!(result["data"]["selection"]["error"]["code"], code);
+        assert_eq!(result["context"]["brain_id"], Value::Null);
+        assert!(
+            !fixture
+                .root
+                .path()
+                .join("project/.brain/config.toml")
+                .exists()
+        );
+        assert_eq!(fixture.state.lock().unwrap().verification_count, checks);
+        fixture.state.lock().unwrap().fail_discovery = false;
+        assert_eq!(fixture.run(&["brains", "list"]).0, 0);
+    }
+}
+
+#[test]
+fn login_preserves_legacy_or_invalid_project_configuration() {
+    for (name, content) in [
+        ("config.json", format!("{{\"brain_id\":\"{SECOND}\"}}")),
+        ("config.toml", "brain_id = 'invalid'\n".into()),
+    ] {
+        let fixture = Fixture::new();
+        let directory = fixture.root.path().join("project/.brain");
+        fs::create_dir(&directory).unwrap();
+        fs::write(directory.join(name), &content).unwrap();
+        let result = fixture.login(&[]);
+        assert_eq!(result["data"]["selection"]["selected"], false);
+        assert_eq!(result["data"]["selection"]["reason"], "failed");
+        assert_eq!(fs::read_to_string(directory.join(name)).unwrap(), content);
+        if name == "config.json" {
+            assert!(!directory.join("config.toml").exists());
+        }
+        assert!(
+            !fixture
+                .state
+                .lock()
+                .unwrap()
+                .requests
+                .iter()
+                .any(|(_, path, _)| path.starts_with("/app/api/cli/"))
+        );
+    }
+}
+
+#[test]
+fn login_preserves_a_selection_saved_during_brain_discovery() {
+    let fixture = Fixture::new();
+    let path = fixture.root.path().join("project/.brain/config.toml");
+    fixture.state.lock().unwrap().select_during_discovery = Some(path.clone());
+    let result = fixture.login(&[]);
+    assert_eq!(result["data"]["selection"]["reason"], "already_selected");
+    assert_eq!(result["context"]["brain_id"], SECOND);
+    assert_eq!(
+        fs::read_to_string(path).unwrap(),
+        format!("brain_id = '{SECOND}'\n")
+    );
+    assert_eq!(fixture.state.lock().unwrap().verification_count, 0);
+}
+
+#[test]
 fn authenticated_workflow_preserves_selection_retry_identity_and_secrets() {
     let fixture = Fixture::new();
-    fixture.login();
+    fixture.login(&["--no-select"]);
     assert_eq!(fixture.run(&["search", "policy"]).0, 2);
     assert_eq!(fixture.run(&["use", FIRST]).0, 0);
     assert_eq!(fixture.state.lock().unwrap().refreshes, 1);
@@ -437,7 +616,7 @@ fn parsing_config_and_stdin_are_predictable_without_authentication() {
             .0,
         2
     );
-    fixture.login();
+    fixture.login(&["--no-select"]);
     assert_eq!(fixture.run(&["use", FIRST]).0, 0);
     let mut child = fixture
         .command()

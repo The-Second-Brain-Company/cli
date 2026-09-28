@@ -50,7 +50,19 @@ impl Context {
     pub fn execute(&mut self, command: Command) -> Result<Value> {
         match command {
             Command::Completions(_) => Err(Error::invalid("Completions are handled before service operations")),
-            Command::Login(options) => auth::login(&self.api.origin, &options),
+            Command::Login(options) => {
+                let mut result = auth::login(&self.api.origin, &options)?;
+                result["selection"] = if options.no_select {
+                    json!({"selected": false, "reason": "disabled"})
+                } else if self.selected.is_some() {
+                    json!({"selected": false, "reason": "brain_override"})
+                } else {
+                    self.select_only_brain().unwrap_or_else(|error| {
+                        json!({"selected": false, "reason": "failed", "error": error})
+                    })
+                };
+                Ok(result)
+            },
             Command::Logout => auth::logout(&self.api.origin),
             Command::RequestId => Ok(json!({"request_id": uuid::Uuid::new_v4().to_string()})),
             Command::Config => Ok(json!({"project": self.project, "brain_id": self.selected, "origin": self.api.origin})),
@@ -68,7 +80,7 @@ impl Context {
                     self.api.request(Method::POST, "/brains", &[], Some(&input))
                 }
             },
-            Command::Use(options) => self.select(&options.brain_id),
+            Command::Use(options) => self.select(&options.brain_id, false),
             Command::Whoami => self.api.whoami(self.brain()?),
             Command::Status => self.get(""),
             Command::Search(options) => self.search(options),
@@ -142,7 +154,38 @@ impl Context {
         config::private_file(path)
     }
 
-    fn select(&mut self, id: &str) -> Result<Value> {
+    fn existing_selection(&mut self) -> Result<Option<Value>> {
+        let Some(id) = config::selected(&self.project)? else {
+            return Ok(None);
+        };
+        self.selected = Some(id.clone());
+        Ok(Some(
+            json!({"selected": false, "reason": "already_selected", "brain_id": id}),
+        ))
+    }
+
+    fn select_only_brain(&mut self) -> Result<Value> {
+        if let Some(selection) = self.existing_selection()? {
+            return Ok(selection);
+        }
+        let account = self.api.get("/brains")?;
+        let brains = account
+            .get("organizations")
+            .and_then(Value::as_array)
+            .ok_or_else(|| Error::new("protocol", "Expected a list of Brains"))?;
+        if brains.len() != 1 {
+            return Ok(
+                json!({"selected": false, "reason": if brains.is_empty() { "no_brains" } else { "multiple_brains" }}),
+            );
+        }
+        let id = brains[0]
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::new("protocol", "Expected a Brain ID"))?;
+        self.select(id, true)
+    }
+
+    fn select(&mut self, id: &str, only_if_unset: bool) -> Result<Value> {
         config::identifier(id, "org")?;
         let directory = self.project.join(".brain");
         config::reject_symlink(&directory)?;
@@ -150,6 +193,9 @@ impl Context {
         let _guard = config::lock(&directory.join("config.lock"))?;
         let path = directory.join("config.toml");
         config::reject_symlink(&path)?;
+        if only_if_unset && let Some(selection) = self.existing_selection()? {
+            return Ok(selection);
+        }
         let previous = if path.exists() {
             Some(fs::read(&path)?)
         } else {

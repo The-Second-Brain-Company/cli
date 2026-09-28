@@ -25,7 +25,9 @@ pub struct Brain {
 
 #[derive(Subcommands)]
 pub enum Command {
-    #[usage(help = "Sign in through the browser using OAuth with PKCE")]
+    #[usage(
+        help = "Sign in through the browser and select your only Brain for an unconfigured project"
+    )]
     Login(Login),
     #[usage(help = "Revoke this CLI connection and delete its local credentials")]
     Logout,
@@ -71,6 +73,11 @@ pub struct Completions {
 
 #[derive(Args)]
 pub struct Login {
+    #[usage(
+        long,
+        help = "Skip automatic project selection when the account has exactly one Brain"
+    )]
+    pub no_select: bool,
     #[usage(
         long,
         help = "Print the authorization URL without opening a browser; keep this command running"

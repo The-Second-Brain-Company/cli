@@ -107,7 +107,13 @@ failure restores the previous selection. `brain config` shows the local configur
 - `--project` chooses the directory; the default is the current directory. Parent directories are
   not searched, so a neighboring project cannot silently select a Brain.
 - `--brain <id>` overrides the selection for one command without changing the file.
-- Authentication selects no default Brain, even when an account has only one membership.
+- Login selects the account's only Brain when the project has no configuration and access verifies
+  successfully. Use `brain login --no-select` to opt out. Existing selections are preserved; zero or
+  multiple memberships require a choice with `brain use`. An explicit `--brain` on login also leaves
+  project configuration unchanged.
+- Login reports its selection outcome in `data.selection`. A discovery or verification failure
+  leaves you signed in and reports `selected: false` with an error; select a Brain later with
+  `brain use`. Existing invalid TOML or JSON-only configuration is preserved for explicit recovery.
 - Creation returns a new Brain but leaves selection unchanged. Run `brain use <new-id>` after
   creation succeeds. This keeps creation retries attached to their original request context.
 - JSON selection is deferred. If only `.brain/config.json` exists, select its intended Brain with
@@ -227,5 +233,5 @@ service has separate real OAuth, role, and recording integration tests. See
 [architecture](docs/architecture.md) and [local testing](docs/testing.md).
 
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
-[Basecamp's skills](https://github.com/basecamp/skills), adapted to explicit Brain selection,
+[Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
 durable knowledge recording, and Second Brain's current access model.

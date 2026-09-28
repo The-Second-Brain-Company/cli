@@ -15,5 +15,5 @@ marketplace, and website publication out of these tasks. Existing MCP packages r
 separately tests its CLI adapter and OAuth authorization.
 
 CLI operations use the service's shared OAuth, role checks, and product handlers. Keep Brain
-selection explicit, credentials outside projects, retry IDs stable, and saved claims tied to durable
+selection verified, credentials outside projects, retry IDs stable, and saved claims tied to durable
 receipts. The private operator boundary remains separate.

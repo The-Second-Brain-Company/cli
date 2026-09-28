@@ -37,6 +37,13 @@ This preserves the original assertion and request identity across lost responses
 continue through bounded waits, and successful process execution is distinct from a saved receipt.
 Exact edits retain optimistic revision checks; the CLI never silently merges or retries them.
 
+After successful authentication, login selects the sole account membership if the project is
+unconfigured. `login --no-select` or a per-command `--brain` skips this step. Existing selections
+are preserved, including a selection saved during membership discovery. Automatic selection uses the
+same project lock, verification, readback, and rollback as `use`. Discovery and selection errors are
+returned in `data.selection` while `signed_in` remains true. Zero or multiple memberships leave the
+project unconfigured. Invalid or JSON-only configuration requires explicit recovery with `use`.
+
 ## Local evaluation boundary
 
 The service adapter adds transport aliases for current operations. It adds no role, management

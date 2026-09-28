@@ -12,8 +12,9 @@ mise run fmt-check
 ```
 
 The compiled-binary tests start an ephemeral loopback fixture. They exercise the browser callback,
-PKCE, invalid state, private credential storage, refresh, revocation, JSON output, stdin, project
-selection, failed-switch rollback, request identity, and one-time secret files. Fixtures contain
+PKCE, invalid state, private credential storage, refresh, revocation, JSON output, stdin, sole-Brain
+login selection, opt-out, existing and concurrent selection preservation, discovery and verification
+failures, failed-switch rollback, request identity, and one-time secret files. Fixtures contain
 synthetic identities and knowledge and do not call a model or external storage. Skill installation
 is tested independently in the Brain skills repository.
 
@@ -39,9 +40,11 @@ substituted. This is separate from the Rust fixture suite; neither claims a live
    browser and complete or skip the personal name. Operator login remains separate.
 4. In a separate evaluation folder, run the locally installed `brain login`. Complete browser
    sign-in and consent. Local delivery returns a masked link in the browser; no email is sent.
-5. Run `brain brains list`, then `brain use <id>`. To create a Brain, get an ID with
-   `brain request-id`, run `brain brains create "Evaluation" --request-id <id>`, and select the
-   returned Organization ID with `brain use`.
+5. Login selects your only Brain for an unconfigured project. Use `brain login --no-select` to opt
+   out. Check `brain config`; if nothing is selected, run `brain brains list`, then
+   `brain use <id>`. To create a Brain, get an ID with `brain request-id`, run
+   `brain brains create "Evaluation" --request-id <id>`, and select the returned Organization ID
+   with `brain use`.
 6. Install the skill into the evaluation folder, restart or reload the harness's instructions if
    needed, and give it the installed binary's PATH. Ask it to record synthetic facts and retrieve
    them with citations. Inspect People and Connected apps in the browser to compare outcomes.
