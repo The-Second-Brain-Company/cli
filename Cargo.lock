@@ -1127,7 +1127,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "second-brain-cli"
+name = "cortex-cli"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",

@@ -11,7 +11,7 @@ if (process.argv.length !== 2) {
 }
 const build = spawnSync(
   "cargo",
-  ["build", "--release", "--locked", "--bin", "brain", "--message-format=json-render-diagnostics"],
+  ["build", "--release", "--locked", "--bin", "cortex", "--message-format=json-render-diagnostics"],
   {
     cwd: source,
     encoding: "utf8",
@@ -20,7 +20,7 @@ const build = spawnSync(
   },
 );
 if (build.error) {
-  process.stderr.write(`Could not build Brain: ${build.error.message}\n`);
+  process.stderr.write(`Could not build Cortex: ${build.error.message}\n`);
   process.exit(1);
 }
 if (build.status !== 0) process.exit(build.status ?? 1);
@@ -31,13 +31,13 @@ const artifact = build.stdout
   .find(
     (event) =>
       event.reason === "compiler-artifact" &&
-      event.target?.name === "brain" &&
+      event.target?.name === "cortex" &&
       event.target.kind.includes("bin") &&
       event.executable,
   );
 if (!artifact) {
   process.stderr.write(
-    "Cargo did not report a Brain executable; the installed version was preserved.\n",
+    "Cargo did not report a Cortex executable; the installed version was preserved.\n",
   );
   process.exit(1);
 }
@@ -48,5 +48,5 @@ const install = spawnSync(
     stdio: "inherit",
   },
 );
-if (install.error) process.stderr.write(`Could not install Brain: ${install.error.message}\n`);
+if (install.error) process.stderr.write(`Could not install Cortex: ${install.error.message}\n`);
 process.exit(install.status ?? 1);

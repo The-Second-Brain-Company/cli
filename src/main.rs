@@ -5,14 +5,15 @@ mod config;
 mod error;
 mod operations;
 
-use args::{Brain, Command};
+use args::{Command, Cortex};
 use error::{Error, Result};
 use serde_json::{Value, json};
 
-fn run(args: Brain) -> Result<Value> {
+fn run(args: Cortex) -> Result<Value> {
     let origin = config::origin(
         &args
             .origin
+            .or_else(|| std::env::var("CORTEX_ORIGIN").ok())
             .or_else(|| std::env::var("BRAIN_ORIGIN").ok())
             .unwrap_or_else(|| config::DEFAULT_ORIGIN.into()),
     )?;
@@ -24,11 +25,11 @@ fn run(args: Brain) -> Result<Value> {
             | Command::Use(_)
             | Command::RequestId
             | Command::Account(_)
-            | Command::Brains(args::Brains {
-                command: args::BrainCommand::List
+            | Command::Cortexes(args::Cortexes {
+                command: args::CortexCommand::List
             })
     );
-    let selected = if let Some(id) = args.brain {
+    let selected = if let Some(id) = args.cortex {
         Some(config::identifier(&id, "org")?)
     } else if bypass_selection {
         None
@@ -40,8 +41,8 @@ fn run(args: Brain) -> Result<Value> {
         | Command::Knowledge(args::Knowledge {
             command: args::KnowledgeCommand::Record(options),
         }) => Some(options.request_id.clone()),
-        Command::Brains(args::Brains {
-            command: args::BrainCommand::Create(options),
+        Command::Cortexes(args::Cortexes {
+            command: args::CortexCommand::Create(options),
         }) => Some(options.request_id.clone()),
         _ => None,
     };
@@ -52,7 +53,7 @@ fn run(args: Brain) -> Result<Value> {
     };
     let result = context.execute(args.command);
     let metadata =
-        json!({"origin": origin, "brain_id": context.selected, "request_id": request_id});
+        json!({"origin": origin, "cortex_id": context.selected, "request_id": request_id});
     match result {
         Ok(data) => {
             let status = data.get("status").and_then(Value::as_str);
@@ -78,7 +79,7 @@ fn run(args: Brain) -> Result<Value> {
 
 fn main() {
     let words = std::env::args_os().skip(1).collect::<Vec<_>>();
-    let args = match Brain::embedded_outcome(&words) {
+    let args = match Cortex::embedded_outcome(&words) {
         usage::embedded::Outcome::Parsed(args) => args,
         usage::embedded::Outcome::Exit(exit) => {
             if exit.code == 0 {
@@ -98,7 +99,7 @@ fn main() {
             "fish" => usage::complete::Shell::Fish,
             _ => usage::complete::Shell::Zsh,
         };
-        print!("{}", Brain::completion_script(shell));
+        print!("{}", Cortex::completion_script(shell));
         return;
     }
     let pretty = args.pretty;

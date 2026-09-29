@@ -12,7 +12,8 @@ pub const DEFAULT_ORIGIN: &str = "http://second-brain.localhost:1355";
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Selection {
-    pub brain_id: String,
+    #[serde(alias = "brain_id")]
+    pub cortex_id: String,
 }
 
 pub fn identifier(value: &str, prefix: &str) -> Result<String> {
@@ -55,12 +56,19 @@ pub fn project(value: Option<&str>) -> Result<PathBuf> {
 }
 
 pub fn selected(project: &Path) -> Result<Option<String>> {
-    let path = project.join(".brain/config.toml");
+    let directory = if project.join(".cortex/config.toml").exists()
+        || project.join(".cortex/config.json").exists()
+    {
+        project.join(".cortex")
+    } else {
+        project.join(".brain")
+    };
+    let path = directory.join("config.toml");
     if !path.exists() {
-        if project.join(".brain/config.json").exists() {
+        if directory.join("config.json").exists() {
             return Err(Error::new(
                 "config",
-                "This project has only .brain/config.json. Select its intended Brain explicitly with brain use; JSON compatibility is deferred.",
+                "This project has only plugin JSON selection. Select its intended Cortex explicitly with cortex use to save CLI configuration.",
             ));
         }
         return Ok(None);
@@ -69,22 +77,36 @@ pub fn selected(project: &Path) -> Result<Option<String>> {
     let selection: Selection = toml::from_str(&raw).map_err(|_| {
         Error::new(
             "config",
-            "Invalid .brain/config.toml; expected only brain_id = \"org_...\"",
+            "Invalid .cortex/config.toml; expected only cortex_id = \"org_...\"",
         )
     })?;
-    Ok(Some(identifier(&selection.brain_id, "org")?))
+    Ok(Some(identifier(&selection.cortex_id, "org")?))
 }
 
 pub fn auth_dir() -> Result<PathBuf> {
-    let base = if let Some(path) = std::env::var_os("BRAIN_HOME") {
+    let base = if let Some(path) =
+        std::env::var_os("CORTEX_HOME").or_else(|| std::env::var_os("BRAIN_HOME"))
+    {
         PathBuf::from(path)
-    } else if let Some(path) = std::env::var_os("XDG_CONFIG_HOME") {
-        PathBuf::from(path).join("second-brain")
     } else {
-        PathBuf::from(std::env::var_os("HOME").ok_or_else(|| {
-            Error::new("config", "Set BRAIN_HOME to a private credential directory")
-        })?)
-        .join(".config/second-brain")
+        let root = if let Some(path) = std::env::var_os("XDG_CONFIG_HOME") {
+            PathBuf::from(path)
+        } else {
+            PathBuf::from(std::env::var_os("HOME").ok_or_else(|| {
+                Error::new(
+                    "config",
+                    "Set CORTEX_HOME to a private credential directory",
+                )
+            })?)
+            .join(".config")
+        };
+        let current = root.join("cortex");
+        let legacy = root.join("second-brain");
+        if !current.exists() && legacy.exists() {
+            legacy
+        } else {
+            current
+        }
     };
     private_dir(&base)?;
     Ok(base)

@@ -18,11 +18,11 @@ run = [
 ]
 
 [tasks.install]
-description = "Build current working files and replace brain in BIN_DIR or ~/.local/bin"
+description = "Build current working files and replace cortex in BIN_DIR or ~/.local/bin"
 dir = "{{config_root}}"
 run = "node scripts/install-dev.mjs"
 
-[tasks.brain]
+[tasks.cortex]
 dir = "{{config_root}}"
 run = "cargo run --locked --"
 

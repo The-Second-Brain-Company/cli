@@ -18,6 +18,58 @@ const FIRST: &str = "org_1111111111111111";
 const SECOND: &str = "org_2222222222222222";
 const RUN: &str = "run_1111111111111111";
 
+#[test]
+fn cortex_reads_legacy_selection_and_credentials_without_migrating_them() {
+    let fixture = Fixture::new();
+    fixture.login(&["--no-select"]);
+    let project = fixture.root.path().join("project");
+    let legacy = project.join(".brain");
+    fs::create_dir(&legacy).unwrap();
+    let content = format!("brain_id = '{FIRST}'\n");
+    fs::write(legacy.join("config.toml"), &content).unwrap();
+    assert_eq!(fixture.run(&["config"]).1["data"]["cortex_id"], FIRST);
+    assert_eq!(fixture.run(&["search", "pricing"]).0, 0);
+    assert!(!project.join(".cortex").exists());
+    assert_eq!(
+        fs::read_to_string(legacy.join("config.toml")).unwrap(),
+        content
+    );
+    let private = fixture.root.path().join("private-config");
+    fs::create_dir(&private).unwrap();
+    fs::rename(
+        fixture.root.path().join("auth"),
+        private.join("second-brain"),
+    )
+    .unwrap();
+    let output = fixture
+        .command()
+        .env_remove("CORTEX_HOME")
+        .env_remove("BRAIN_HOME")
+        .env("XDG_CONFIG_HOME", &private)
+        .arg("whoami")
+        .output()
+        .unwrap();
+    assert_eq!(decode(output).0, 0);
+    assert!(!private.join("cortex").exists());
+    fs::rename(
+        private.join("second-brain"),
+        fixture.root.path().join("auth"),
+    )
+    .unwrap();
+    assert_eq!(fixture.run(&["use", SECOND]).0, 0);
+    assert_eq!(fixture.run(&["config"]).1["data"]["cortex_id"], SECOND);
+    assert_eq!(
+        fs::read_to_string(legacy.join("config.toml")).unwrap(),
+        content
+    );
+    fs::write(
+        project.join(".cortex/config.toml"),
+        "cortex_id = 'invalid'\n",
+    )
+    .unwrap();
+    assert_ne!(fixture.run(&["config"]).0, 0);
+}
+
 #[derive(Default)]
 struct State {
     requests: Vec<(String, String, Value)>,
@@ -152,20 +204,20 @@ impl Fixture {
                             201,
                             json!({"id": "access_1111111111111111", "token": "synthetic-git-secret"}),
                         )
-                    } else if path.ends_with("/brains")
+                    } else if path.ends_with("/cortexes")
                         && request.method() == &tiny_http::Method::Post
                     {
                         (
                             200,
                             json!({"organization": {"id": SECOND, "name": input["name"]}}),
                         )
-                    } else if path.ends_with("/brains") {
+                    } else if path.ends_with("/cortexes") {
                         if let Some(path) = state.select_during_discovery.take() {
                             fs::create_dir_all(path.parent().unwrap()).unwrap();
-                            fs::write(path, format!("brain_id = '{SECOND}'\n")).unwrap();
+                            fs::write(path, format!("cortex_id = '{SECOND}'\n")).unwrap();
                         }
                         if state.fail_discovery {
-                            (503, json!({"error": "Brain discovery unavailable"}))
+                            (503, json!({"error": "Cortex discovery unavailable"}))
                         } else {
                             (200, json!({"organizations": state.organizations}))
                         }
@@ -228,12 +280,12 @@ impl Fixture {
         command
     }
     fn local_command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_brain"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cortex"));
         command
             .args(["--origin", &self.origin])
             .current_dir(self.root.path().join("project"))
-            .env("BRAIN_HOME", self.root.path().join("auth"))
-            .env_remove("BRAIN_ORIGIN")
+            .env("CORTEX_HOME", self.root.path().join("auth"))
+            .env_remove("CORTEX_ORIGIN")
             .env("NO_COLOR", "1");
         command
     }
@@ -339,7 +391,7 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
     fixture.login(&[]);
     let local = decode(fixture.local_command().arg("config").output().unwrap());
     assert_eq!(local.0, 0);
-    assert_eq!(local.1["data"]["brain_id"], FIRST);
+    assert_eq!(local.1["data"]["cortex_id"], FIRST);
     let search = decode(
         fixture
             .local_command()
@@ -348,12 +400,12 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
             .unwrap(),
     );
     assert_eq!(search.0, 0);
-    assert_eq!(search.1["context"]["brain_id"], FIRST);
+    assert_eq!(search.1["context"]["cortex_id"], FIRST);
     let other = fixture.root.path().join("other");
-    fs::create_dir_all(other.join(".brain")).unwrap();
+    fs::create_dir_all(other.join(".cortex")).unwrap();
     fs::write(
-        other.join(".brain/config.toml"),
-        format!("brain_id = '{SECOND}'\n"),
+        other.join(".cortex/config.toml"),
+        format!("cortex_id = '{SECOND}'\n"),
     )
     .unwrap();
     let search = decode(
@@ -365,7 +417,7 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
             .unwrap(),
     );
     assert_eq!(search.0, 0);
-    assert_eq!(search.1["context"]["brain_id"], SECOND);
+    assert_eq!(search.1["context"]["cortex_id"], SECOND);
     let unconfigured = decode(
         fixture
             .local_command()
@@ -375,7 +427,7 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
             .unwrap(),
     );
     assert_eq!(unconfigured.0, 0);
-    assert_eq!(unconfigured.1["data"]["brain_id"], Value::Null);
+    assert_eq!(unconfigured.1["data"]["cortex_id"], Value::Null);
     assert_eq!(
         decode(
             fixture
@@ -388,7 +440,7 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
         .0,
         2
     );
-    assert!(!fixture.root.path().join(".brain").exists());
+    assert!(!fixture.root.path().join(".cortex").exists());
     assert!(
         fs::read_dir(fixture.root.path().join("auth"))
             .unwrap()
@@ -401,7 +453,7 @@ fn plain_commands_use_the_working_directory_selection_and_never_a_global_default
 }
 
 #[test]
-fn login_selects_the_only_brain_and_preserves_existing_selection_on_relogin() {
+fn login_selects_the_only_cortex_and_preserves_existing_selection_on_relogin() {
     let fixture = Fixture::new();
     let result = fixture.login(&[]);
     assert_eq!(result["data"]["selection"]["selected"], true);
@@ -409,18 +461,18 @@ fn login_selects_the_only_brain_and_preserves_existing_selection_on_relogin() {
         result["data"]["selection"]["identity"]["organization"]["id"],
         FIRST
     );
-    assert_eq!(result["context"]["brain_id"], FIRST);
-    assert_eq!(fixture.run(&["config"]).1["data"]["brain_id"], FIRST);
+    assert_eq!(result["context"]["cortex_id"], FIRST);
+    assert_eq!(fixture.run(&["config"]).1["data"]["cortex_id"], FIRST);
     assert_eq!(fixture.state.lock().unwrap().verification_count, 2);
     assert_eq!(fixture.run(&["search", "policy"]).0, 0);
 
     assert_eq!(fixture.run(&["use", SECOND]).0, 0);
-    let path = fixture.root.path().join("project/.brain/config.toml");
+    let path = fixture.root.path().join("project/.cortex/config.toml");
     let original = fs::read(&path).unwrap();
     fixture.state.lock().unwrap().requests.clear();
     let result = fixture.login(&[]);
     assert_eq!(result["data"]["selection"]["reason"], "already_selected");
-    assert_eq!(result["context"]["brain_id"], SECOND);
+    assert_eq!(result["context"]["cortex_id"], SECOND);
     assert_eq!(fs::read(path).unwrap(), original);
     assert!(
         !fixture
@@ -435,16 +487,16 @@ fn login_selects_the_only_brain_and_preserves_existing_selection_on_relogin() {
 
 #[test]
 fn login_opt_out_and_invocation_override_leave_project_unconfigured() {
-    for (args, reason, brain) in [
+    for (args, reason, cortex) in [
         (vec!["--no-select"], "disabled", Value::Null),
-        (vec!["--brain", SECOND], "brain_override", json!(SECOND)),
+        (vec!["--cortex", SECOND], "cortex_override", json!(SECOND)),
     ] {
         let fixture = Fixture::new();
         let result = fixture.login(&args);
         assert_eq!(result["data"]["selection"]["selected"], false);
         assert_eq!(result["data"]["selection"]["reason"], reason);
-        assert_eq!(result["context"]["brain_id"], brain);
-        assert!(!fixture.root.path().join("project/.brain").exists());
+        assert_eq!(result["context"]["cortex_id"], cortex);
+        assert!(!fixture.root.path().join("project/.cortex").exists());
         assert!(
             !fixture
                 .state
@@ -454,17 +506,17 @@ fn login_opt_out_and_invocation_override_leave_project_unconfigured() {
                 .iter()
                 .any(|(_, path, _)| path.starts_with("/app/api/cli/"))
         );
-        assert_eq!(fixture.run(&["brains", "list"]).0, 0);
+        assert_eq!(fixture.run(&["cortexes", "list"]).0, 0);
     }
 }
 
 #[test]
-fn login_requires_a_choice_with_zero_or_multiple_brains() {
+fn login_requires_a_choice_with_zero_or_multiple_cortexes() {
     for (organizations, reason) in [
-        (vec![], "no_brains"),
+        (vec![], "no_cortexes"),
         (
             vec![json!({"id": FIRST}), json!({"id": SECOND})],
-            "multiple_brains",
+            "multiple_cortexes",
         ),
     ] {
         let fixture = Fixture::new();
@@ -472,8 +524,8 @@ fn login_requires_a_choice_with_zero_or_multiple_brains() {
         let result = fixture.login(&[]);
         assert_eq!(result["data"]["selection"]["selected"], false);
         assert_eq!(result["data"]["selection"]["reason"], reason);
-        assert_eq!(result["context"]["brain_id"], Value::Null);
-        assert!(!fixture.root.path().join("project/.brain").exists());
+        assert_eq!(result["context"]["cortex_id"], Value::Null);
+        assert!(!fixture.root.path().join("project/.cortex").exists());
         assert_eq!(fixture.state.lock().unwrap().verification_count, 0);
         assert_eq!(fixture.run(&["search", "policy"]).0, 2);
     }
@@ -497,28 +549,28 @@ fn login_keeps_authentication_when_discovery_or_selection_fails() {
         assert_eq!(result["data"]["selection"]["selected"], false);
         assert_eq!(result["data"]["selection"]["reason"], "failed");
         assert_eq!(result["data"]["selection"]["error"]["code"], code);
-        assert_eq!(result["context"]["brain_id"], Value::Null);
+        assert_eq!(result["context"]["cortex_id"], Value::Null);
         assert!(
             !fixture
                 .root
                 .path()
-                .join("project/.brain/config.toml")
+                .join("project/.cortex/config.toml")
                 .exists()
         );
         assert_eq!(fixture.state.lock().unwrap().verification_count, checks);
         fixture.state.lock().unwrap().fail_discovery = false;
-        assert_eq!(fixture.run(&["brains", "list"]).0, 0);
+        assert_eq!(fixture.run(&["cortexes", "list"]).0, 0);
     }
 }
 
 #[test]
 fn login_preserves_legacy_or_invalid_project_configuration() {
     for (name, content) in [
-        ("config.json", format!("{{\"brain_id\":\"{SECOND}\"}}")),
-        ("config.toml", "brain_id = 'invalid'\n".into()),
+        ("config.json", format!("{{\"cortex_id\":\"{SECOND}\"}}")),
+        ("config.toml", "cortex_id = 'invalid'\n".into()),
     ] {
         let fixture = Fixture::new();
-        let directory = fixture.root.path().join("project/.brain");
+        let directory = fixture.root.path().join("project/.cortex");
         fs::create_dir(&directory).unwrap();
         fs::write(directory.join(name), &content).unwrap();
         let result = fixture.login(&[]);
@@ -541,16 +593,16 @@ fn login_preserves_legacy_or_invalid_project_configuration() {
 }
 
 #[test]
-fn login_preserves_a_selection_saved_during_brain_discovery() {
+fn login_preserves_a_selection_saved_during_cortex_discovery() {
     let fixture = Fixture::new();
-    let path = fixture.root.path().join("project/.brain/config.toml");
+    let path = fixture.root.path().join("project/.cortex/config.toml");
     fixture.state.lock().unwrap().select_during_discovery = Some(path.clone());
     let result = fixture.login(&[]);
     assert_eq!(result["data"]["selection"]["reason"], "already_selected");
-    assert_eq!(result["context"]["brain_id"], SECOND);
+    assert_eq!(result["context"]["cortex_id"], SECOND);
     assert_eq!(
         fs::read_to_string(path).unwrap(),
-        format!("brain_id = '{SECOND}'\n")
+        format!("cortex_id = '{SECOND}'\n")
     );
     assert_eq!(fixture.state.lock().unwrap().verification_count, 0);
 }
@@ -562,13 +614,13 @@ fn authenticated_workflow_preserves_selection_retry_identity_and_secrets() {
     assert_eq!(fixture.run(&["search", "policy"]).0, 2);
     assert_eq!(fixture.run(&["use", FIRST]).0, 0);
     assert_eq!(fixture.state.lock().unwrap().refreshes, 1);
-    let config_path = fixture.root.path().join("project/.brain/config.toml");
+    let config_path = fixture.root.path().join("project/.cortex/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     assert!(config.contains(FIRST));
     assert!(!config.contains("token"));
-    let search = fixture.run(&["--brain", SECOND, "search", "policy", "--limit", "3"]);
+    let search = fixture.run(&["--cortex", SECOND, "search", "policy", "--limit", "3"]);
     assert_eq!(search.0, 0);
-    assert_eq!(search.1["context"]["brain_id"], SECOND);
+    assert_eq!(search.1["context"]["cortex_id"], SECOND);
     assert_eq!(search.1["data"]["query"]["limit"], 3);
     assert!(
         search.1["data"]["results"][0]["source_url"]
@@ -585,9 +637,9 @@ fn authenticated_workflow_preserves_selection_retry_identity_and_secrets() {
     assert_eq!(fs::read_to_string(&config_path).unwrap(), config);
     fixture.state.lock().unwrap().fail_verification = false;
     let created = fixture.run(&[
-        "brains",
+        "cortexes",
         "create",
-        "New Brain",
+        "New Cortex",
         "--request-id",
         "stable-creation",
     ]);
@@ -684,9 +736,9 @@ fn authenticated_workflow_preserves_selection_retry_identity_and_secrets() {
     let creation = state
         .requests
         .iter()
-        .find(|(_, path, _)| path.ends_with("/brains"))
+        .find(|(_, path, _)| path.ends_with("/cortexes"))
         .unwrap();
-    assert_eq!(creation.2["brain_id"], FIRST);
+    assert_eq!(creation.2["cortex_id"], FIRST);
     assert_eq!(creation.2["requestId"], "stable-creation");
     assert_eq!(
         state
@@ -712,7 +764,7 @@ fn parsing_config_and_stdin_are_predictable_without_authentication() {
         .unwrap();
     assert!(help.status.success());
     assert!(String::from_utf8_lossy(&help.stdout).contains("--role"));
-    let schema = Command::new(env!("CARGO_BIN_EXE_brain"))
+    let schema = Command::new(env!("CARGO_BIN_EXE_cortex"))
         .arg("__usage_spec__")
         .output()
         .unwrap();
@@ -724,21 +776,21 @@ fn parsing_config_and_stdin_are_predictable_without_authentication() {
         .output()
         .unwrap();
     assert!(completions.status.success());
-    assert!(String::from_utf8_lossy(&completions.stdout).contains("brain"));
+    assert!(String::from_utf8_lossy(&completions.stdout).contains("cortex"));
     assert_eq!(fixture.run(&["unknown-command"]).0, 2);
     assert_eq!(fixture.run(&["record", "--text", "facts"]).0, 2);
-    assert_eq!(fixture.run(&["config"]).1["data"]["brain_id"], Value::Null);
-    let directory = fixture.root.path().join("project/.brain");
+    assert_eq!(fixture.run(&["config"]).1["data"]["cortex_id"], Value::Null);
+    let directory = fixture.root.path().join("project/.cortex");
     fs::create_dir(&directory).unwrap();
     fs::write(
         directory.join("config.json"),
-        format!("{{\"brain_id\":\"{FIRST}\"}}"),
+        format!("{{\"cortex_id\":\"{FIRST}\"}}"),
     )
     .unwrap();
     assert_eq!(fixture.run(&["config"]).0, 2);
-    fs::write(directory.join("config.toml"), "brain_id = 'invalid'\n").unwrap();
+    fs::write(directory.join("config.toml"), "cortex_id = 'invalid'\n").unwrap();
     assert_eq!(fixture.run(&["config"]).0, 2);
-    assert_eq!(fixture.run(&["--brain", FIRST, "config"]).0, 0);
+    assert_eq!(fixture.run(&["--cortex", FIRST, "config"]).0, 0);
     assert_eq!(
         fixture
             .run(&["--origin", "http://example.com", "request-id"])

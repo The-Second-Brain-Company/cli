@@ -1,13 +1,13 @@
 [package]
-name = "second-brain-cli"
+name = "cortex-cli"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.98"
 publish = false
-description = "Second Brain CLI for people and coding agents"
+description = "Cortex CLI for people and coding agents"
 
 [[bin]]
-name = "brain"
+name = "cortex"
 path = "src/main.rs"
 
 [dependencies]

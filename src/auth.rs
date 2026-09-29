@@ -31,7 +31,7 @@ pub fn client(origin: &str) -> Result<Client> {
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(45))
         .connect_timeout(Duration::from_secs(10))
-        .user_agent(concat!("second-brain-cli/", env!("CARGO_PKG_VERSION")));
+        .user_agent(concat!("cortex-cli/", env!("CARGO_PKG_VERSION")));
     if let Some(host) = url.host_str()
         && (host == "localhost" || host.ends_with(".localhost"))
     {
@@ -128,7 +128,7 @@ pub fn access_token(origin: &str, client: &Client) -> Result<String> {
                 ("resource", &format!("{origin}/app/api/mcp")),
             ])
             .send()?;
-        let tokens = decode(response).map_err(|_| Error::new("authentication", "Could not refresh this connection. Run brain login again; preserve pending request IDs."))?;
+        let tokens = decode(response).map_err(|_| Error::new("authentication", "Could not refresh this connection. Run cortex login again; preserve pending request IDs."))?;
         save_tokens(&path, &mut credentials, tokens)?;
     }
     Ok(credentials.access_token)
@@ -139,13 +139,13 @@ fn read_credentials(origin: &str, path: &std::path::Path) -> Result<Credentials>
     let bytes = fs::read(path).map_err(|_| {
         Error::new(
             "authentication",
-            "No CLI credentials for this origin. Run brain login.",
+            "No CLI credentials for this origin. Run cortex login.",
         )
     })?;
     let credentials: Credentials = serde_json::from_slice(&bytes).map_err(|_| {
         Error::new(
             "authentication",
-            "Invalid local credential file. Run brain login.",
+            "Invalid local credential file. Run cortex login.",
         )
     })?;
     if credentials.origin != origin {
@@ -220,7 +220,7 @@ pub fn login(origin: &str, options: &Login) -> Result<Value> {
     let callback_path = format!("/callback/{}", uuid::Uuid::new_v4());
     let redirect_uri = format!("http://127.0.0.1:{port}{callback_path}");
     let registration = decode(client.post(format!("{origin}/app/api/oauth/register")).json(&json!({
-        "client_name": "Second Brain CLI (local evaluation)", "redirect_uris": [redirect_uri],
+        "client_name": "Cortex CLI (local evaluation)", "redirect_uris": [redirect_uri],
         "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"]
     })).send()?)?;
     let client_id = text(&registration, "client_id")?;
@@ -299,7 +299,7 @@ pub fn login(origin: &str, options: &Login) -> Result<Value> {
                 };
                 save_tokens(&path, &mut credentials, tokens)?;
                 let _ = request.respond(tiny_http::Response::from_string(
-                    "Signed in to Second Brain. Return to your agent or terminal.",
+                    "Signed in to Cortex. Return to your agent or terminal.",
                 ));
                 return Ok(
                     json!({"signed_in": true, "origin": origin, "scopes": credentials.scope.split_whitespace().collect::<Vec<_>>() }),
@@ -316,7 +316,7 @@ pub fn login(origin: &str, options: &Login) -> Result<Value> {
     }
     Err(Error::new(
         "authentication",
-        "Login timed out. Run brain login again.",
+        "Login timed out. Run cortex login again.",
     ))
 }
 

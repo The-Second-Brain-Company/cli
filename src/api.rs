@@ -42,21 +42,21 @@ impl Api {
     }
     pub fn org(
         &self,
-        brain: &str,
+        cortex: &str,
         method: Method,
         suffix: &str,
         query: &[(&str, String)],
         input: Option<&Value>,
     ) -> Result<Value> {
-        config::identifier(brain, "org")?;
-        self.request(method, &format!("/orgs/{brain}{suffix}"), query, input)
+        config::identifier(cortex, "org")?;
+        self.request(method, &format!("/orgs/{cortex}{suffix}"), query, input)
     }
-    pub fn whoami(&self, brain: &str) -> Result<Value> {
-        let identity = self.org(brain, Method::GET, "/membership", &[], None)?;
-        if identity.pointer("/organization/id").and_then(Value::as_str) != Some(brain) {
+    pub fn whoami(&self, cortex: &str) -> Result<Value> {
+        let identity = self.org(cortex, Method::GET, "/membership", &[], None)?;
+        if identity.pointer("/organization/id").and_then(Value::as_str) != Some(cortex) {
             return Err(Error::new(
                 "conflict",
-                "Server returned a different Brain; no local selection changed",
+                "Server returned a different Cortex; no local selection changed",
             ));
         }
         Ok(identity)

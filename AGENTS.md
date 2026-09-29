@@ -1,4 +1,4 @@
-# Brain CLI development
+# Cortex CLI development
 
 Use mise tasks from this directory. Rust commands run through pinned Rust and mr-boxington; Usage
 owns command parsing, help, and completions. Keep dependency versions exact and commit Cargo.lock.
@@ -14,6 +14,6 @@ marketplace, and website publication out of these tasks. Existing MCP packages r
 `mise run test`, `mise run fmt`, and `mise run fmt-check` before committing. The service repository
 separately tests its CLI adapter and OAuth authorization.
 
-CLI operations use the service's shared OAuth, role checks, and product handlers. Keep Brain
+CLI operations use the service's shared OAuth, role checks, and product handlers. Keep Cortex
 selection verified, credentials outside projects, retry IDs stable, and saved claims tied to durable
 receipts. The private operator boundary remains separate.
