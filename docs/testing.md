@@ -12,13 +12,13 @@ mise run fmt-check
 ```
 
 The compiled-binary tests start an ephemeral loopback fixture. They exercise the browser callback,
-PKCE, invalid state, private credential storage, refresh, revocation, JSON output, stdin,
-sole-Cortex login selection, opt-out, existing and concurrent selection preservation, discovery and
-verification failures, failed-switch rollback, selection from the current working directory, request
-identity, and one-time secret files. Fixtures contain synthetic identities and knowledge and do not
-call a model or external storage. Compressed-response fixtures cover Brotli and gzip across OAuth
-login, refresh, search results, and service permission errors. Skill installation is tested
-independently in the Cortex skills repository.
+PKCE, invalid state, private credential storage, refresh, revocation, JSON output, stdin, sole-Brain
+login selection, opt-out, existing and concurrent selection preservation, discovery and verification
+failures, failed-switch rollback, selection from the current working directory, request identity,
+and one-time secret files. Fixtures contain synthetic identities and knowledge and do not call a
+model or external storage. Compressed-response fixtures cover Brotli and gzip across OAuth login,
+refresh, search results, and service permission errors. Skill installation is tested independently
+in the Cortex skills repository.
 
 Installer tests replace development and release fixtures in the same temporary directory, preserve
 the previous executable when a replacement fails validation, and cover existing symlinks and paths
@@ -39,7 +39,7 @@ substituted. This is separate from the Rust fixture suite; neither claims a live
 service's repository tests also exercise direct retrieval without a Sandbox binding, including file
 and match pagination, partial failures, pinned ranges, and the selected Sandbox path.
 
-## Try your own local Cortex
+## Try your own local Brain
 
 1. In the service checkout, follow its local development setup for Code Storage and the private
    admin password. Use the tracked `.dev.vars.example` files as the variable reference. Credentials
@@ -50,20 +50,20 @@ and match pagination, partial failures, pinned ranges, and the selected Sandbox 
    browser and complete or skip the personal name. Operator login remains separate.
 4. In an evaluation directory, run the locally installed `cortex login`. Complete browser sign-in
    and consent. Local delivery returns a masked link in the browser; no email is sent.
-5. Login selects your only Cortex when the directory has no saved selection. Use
+5. Login selects your only Brain when the directory has no saved selection. Use
    `cortex login --no-select` to opt out. Check `cortex config`; if nothing is selected, run
-   `cortex cortexes list`, then `cortex use <id>`. To create a Cortex, get an ID with
-   `cortex request-id`, run `cortex cortexes create "Evaluation" --request-id <id>`, and select the
+   `cortex brains list`, then `cortex use <id>`. To create a Brain, get an ID with
+   `cortex request-id`, run `cortex brains create "Evaluation" --request-id <id>`, and select the
    returned Organization ID with `cortex use`.
 6. Install the skill globally, restart or reload the harness's instructions if needed, and give it
    the installed binary's PATH. Ask it to record synthetic facts and retrieve them with citations.
    Inspect People and Connected apps in the browser to compare outcomes.
-7. Use `cortex logout` when finished. Remove test Cortexes only through tracked admin cleanup. Do
-   not wipe local databases or remove provider repositories manually.
+7. Use `cortex logout` when finished. Remove test Brains only through tracked admin cleanup. Do not
+   wipe local databases or remove provider repositories manually.
 
 Use a new private directory through `CORTEX_HOME` to isolate CLI credentials during evaluation.
 Commands automatically respect the current directory's `.cortex/config.toml`. Use
-`--project /path/to/project` to target another folder. No global Cortex selection is stored.
+`--project /path/to/project` to target another folder. No global Brain selection is stored.
 `--origin` must match the running service origin exactly. Login listens on `127.0.0.1`; a remote
 browser must be able to reach that loopback callback on the CLI's machine. A network sandbox may
 need permission for the listener and service connection.

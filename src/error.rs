@@ -58,7 +58,7 @@ impl From<reqwest::Error> for Error {
         Self::new(
             "network",
             if error.is_timeout() {
-                "Request timed out. Preserve the original Cortex, retry ID, and input after an uncertain write."
+                "Request timed out. Preserve the original Brain, retry ID, and input after an uncertain write."
             } else {
                 "Request failed. Check the service origin and connection. Preserve retry identity after an uncertain write."
             },

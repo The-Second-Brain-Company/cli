@@ -20,32 +20,31 @@ pub struct Context {
 }
 
 impl Context {
-    fn cortex(&self) -> Result<&str> {
+    fn brain(&self) -> Result<&str> {
         self.selected.as_deref().ok_or_else(|| {
             Error::new(
                 "config",
-                "No Cortex selected. Choose one with cortex cortexes list and cortex use <id>.",
+                "No Brain selected. Choose one with cortex brains list and cortex use <id>.",
             )
         })
     }
     fn get(&self, path: &str) -> Result<Value> {
-        self.api.org(self.cortex()?, Method::GET, path, &[], None)
+        self.api.org(self.brain()?, Method::GET, path, &[], None)
     }
     fn mutate(&self, method: Method, path: &str, input: Value) -> Result<Value> {
-        self.api
-            .org(self.cortex()?, method, path, &[], Some(&input))
+        self.api.org(self.brain()?, method, path, &[], Some(&input))
     }
     fn query(&self, input: Value, revision: Option<&str>) -> Result<Value> {
         let mut query = revision_query(revision)?;
         query.push(("input", input.to_string()));
         let mut result = self.api.org(
-            self.cortex()?,
+            self.brain()?,
             Method::GET,
             "/knowledge/retrieve",
             &query,
             None,
         )?;
-        add_sources(&mut result, &self.api.origin, self.cortex()?);
+        add_sources(&mut result, &self.api.origin, self.brain()?);
         Ok(result)
     }
     pub fn execute(&mut self, command: Command) -> Result<Value> {
@@ -56,9 +55,9 @@ impl Context {
                 result["selection"] = if options.no_select {
                     json!({"selected": false, "reason": "disabled"})
                 } else if self.selected.is_some() {
-                    json!({"selected": false, "reason": "cortex_override"})
+                    json!({"selected": false, "reason": "brain_override"})
                 } else {
-                    self.select_only_cortex().unwrap_or_else(|error| {
+                    self.select_only_brain().unwrap_or_else(|error| {
                         json!({"selected": false, "reason": "failed", "error": error})
                     })
                 };
@@ -66,23 +65,23 @@ impl Context {
             },
             Command::Logout => auth::logout(&self.api.origin),
             Command::RequestId => Ok(json!({"request_id": uuid::Uuid::new_v4().to_string()})),
-            Command::Config => Ok(json!({"project": self.project, "cortex_id": self.selected, "origin": self.api.origin})),
+            Command::Config => Ok(json!({"project": self.project, "brain_id": self.selected, "origin": self.api.origin})),
             Command::Account(options) => match options.command {
                 AccountCommand::Show => self.api.get("/account"),
                 AccountCommand::Profile(options) => self.api.request(Method::PATCH, "/profile", &[], Some(&json!({"name": options.name}))),
                 AccountCommand::Disconnect(options) => self.api.request(Method::DELETE, &format!("/connections/{}", config::identifier(&options.connection_id, "ogr")?), &[], None),
             },
-            Command::Cortexes(options) => match options.command {
-                CortexCommand::List => self.api.get("/cortexes"),
-                CortexCommand::Create(options) => {
+            Command::Brains(options) => match options.command {
+                BrainCommand::List => self.api.get("/brains"),
+                BrainCommand::Create(options) => {
                     request_id(&options.request_id)?;
                     let mut input = json!({"name": options.name, "requestId": options.request_id});
-                    if let Some(cortex) = &self.selected { input["cortex_id"] = json!(cortex); }
-                    self.api.request(Method::POST, "/cortexes", &[], Some(&input))
+                    if let Some(brain) = &self.selected { input["brain_id"] = json!(brain); }
+                    self.api.request(Method::POST, "/brains", &[], Some(&input))
                 }
             },
-            Command::Use(options) => self.select(&options.cortex_id, false),
-            Command::Whoami => self.api.whoami(self.cortex()?),
+            Command::Use(options) => self.select(&options.brain_id, false),
+            Command::Whoami => self.api.whoami(self.brain()?),
             Command::Status => self.get(""),
             Command::Search(options) => self.search(options),
             Command::Read(options) => self.read(options),
@@ -187,28 +186,28 @@ impl Context {
         };
         self.selected = Some(id.clone());
         Ok(Some(
-            json!({"selected": false, "reason": "already_selected", "cortex_id": id}),
+            json!({"selected": false, "reason": "already_selected", "brain_id": id}),
         ))
     }
 
-    fn select_only_cortex(&mut self) -> Result<Value> {
+    fn select_only_brain(&mut self) -> Result<Value> {
         if let Some(selection) = self.existing_selection()? {
             return Ok(selection);
         }
-        let account = self.api.get("/cortexes")?;
-        let cortexes = account
+        let account = self.api.get("/brains")?;
+        let brains = account
             .get("organizations")
             .and_then(Value::as_array)
-            .ok_or_else(|| Error::new("protocol", "Expected a list of Cortexes"))?;
-        if cortexes.len() != 1 {
+            .ok_or_else(|| Error::new("protocol", "Expected a list of Brains"))?;
+        if brains.len() != 1 {
             return Ok(
-                json!({"selected": false, "reason": if cortexes.is_empty() { "no_cortexes" } else { "multiple_cortexes" }}),
+                json!({"selected": false, "reason": if brains.is_empty() { "no_brains" } else { "multiple_brains" }}),
             );
         }
-        let id = cortexes[0]
+        let id = brains[0]
             .get("id")
             .and_then(Value::as_str)
-            .ok_or_else(|| Error::new("protocol", "Expected a Cortex ID"))?;
+            .ok_or_else(|| Error::new("protocol", "Expected a Brain ID"))?;
         self.select(id, true)
     }
 
@@ -230,13 +229,13 @@ impl Context {
         };
         self.api.whoami(id)?;
         let content = toml::to_string(&config::Selection {
-            cortex_id: id.into(),
+            brain_id: id.into(),
         })
-        .map_err(|_| Error::new("config", "Could not encode Cortex selection"))?;
+        .map_err(|_| Error::new("config", "Could not encode Brain selection"))?;
         config::atomic_write(&path, content.as_bytes())?;
         let verified = (|| {
             if config::selected(&self.project)?.as_deref() != Some(id) {
-                return Err(Error::new("config", "Cortex selection readback mismatch"));
+                return Err(Error::new("config", "Brain selection readback mismatch"));
             }
             self.api.whoami(id)
         })();
@@ -286,13 +285,13 @@ impl Context {
                 ));
                 let mut result =
                     self.api
-                        .org(self.cortex()?, Method::GET, "/knowledge", &query, None)?;
+                        .org(self.brain()?, Method::GET, "/knowledge", &query, None)?;
                 result["path"] = json!(options.path);
-                add_sources(&mut result, &self.api.origin, self.cortex()?);
+                add_sources(&mut result, &self.api.origin, self.brain()?);
                 Ok(result)
             }
             KnowledgeCommand::List(options) => self.api.org(
-                self.cortex()?,
+                self.brain()?,
                 Method::GET,
                 "/knowledge/files",
                 &revision_query(options.revision.as_deref())?,
@@ -367,7 +366,7 @@ impl Context {
                     ("limit", options.limit.to_string()),
                 ]);
                 self.api.org(
-                    self.cortex()?,
+                    self.brain()?,
                     Method::GET,
                     "/knowledge/attachment",
                     &query,
@@ -398,7 +397,7 @@ impl Context {
             return Err(Error::invalid("wait must be 0-25 seconds"));
         }
         self.api.org(
-            self.cortex()?,
+            self.brain()?,
             Method::GET,
             &format!("/runs/{}", config::identifier(run, "run")?),
             &[("waitMs", (seconds * 1000).to_string())],
@@ -522,7 +521,7 @@ fn revision_query(revision: Option<&str>) -> Result<Vec<(&'static str, String)>>
         )),
     }
 }
-fn add_sources(value: &mut Value, origin: &str, cortex: &str) {
+fn add_sources(value: &mut Value, origin: &str, brain: &str) {
     let Some(revision) = value
         .get("revision")
         .and_then(Value::as_str)
@@ -530,28 +529,28 @@ fn add_sources(value: &mut Value, origin: &str, cortex: &str) {
     else {
         return;
     };
-    fn visit(value: &mut Value, origin: &str, cortex: &str, revision: &str) {
+    fn visit(value: &mut Value, origin: &str, brain: &str, revision: &str) {
         match value {
             Value::Object(object) => {
                 if let Some(path) = object.get("path").and_then(Value::as_str) {
                     let mut url =
-                        reqwest::Url::parse(&format!("{origin}/app/{cortex}/knowledge")).unwrap();
+                        reqwest::Url::parse(&format!("{origin}/app/{brain}/knowledge")).unwrap();
                     url.query_pairs_mut()
                         .append_pair("path", path.trim_start_matches('/'))
                         .append_pair("revision", revision);
                     object.insert("source_url".into(), json!(url.as_str()));
                 }
                 for (_, child) in object.iter_mut() {
-                    visit(child, origin, cortex, revision);
+                    visit(child, origin, brain, revision);
                 }
             }
             Value::Array(values) => {
                 for child in values {
-                    visit(child, origin, cortex, revision);
+                    visit(child, origin, brain, revision);
                 }
             }
             _ => {}
         }
     }
-    visit(value, origin, cortex, &revision);
+    visit(value, origin, brain, &revision);
 }

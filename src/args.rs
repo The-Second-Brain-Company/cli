@@ -14,9 +14,9 @@ pub struct Cortex {
     #[usage(
         long,
         global,
-        help = "Explicit Cortex ID for this invocation; does not change project selection"
+        help = "Explicit Brain ID for this invocation; does not change project selection"
     )]
-    pub cortex: Option<String>,
+    pub brain: Option<String>,
     #[usage(long, global, help = "Indent JSON output")]
     pub pretty: bool,
     #[usage(subcommand)]
@@ -26,24 +26,24 @@ pub struct Cortex {
 #[derive(Subcommands)]
 pub enum Command {
     #[usage(
-        help = "Sign in through the browser and select your only Cortex for an unconfigured project"
+        help = "Sign in through the browser and select your only Brain for an unconfigured project"
     )]
     Login(Login),
     #[usage(help = "Revoke this CLI connection and delete its local credentials")]
     Logout,
     #[usage(help = "Inspect the signed-in account and manage your own profile or apps")]
     Account(Account),
-    #[usage(help = "List or create Cortexes")]
-    Cortexes(Cortexes),
-    #[usage(help = "Verify and select a Cortex for this project")]
+    #[usage(help = "List or create Brains")]
+    Brains(Brains),
+    #[usage(help = "Verify and select a Brain for this project")]
     Use(Select),
     #[usage(help = "Show local selection without accessing knowledge")]
     Config,
-    #[usage(help = "Verify the selected Cortex, identity, role, and scopes")]
+    #[usage(help = "Verify the selected Brain, identity, role, and scopes")]
     Whoami,
     #[usage(help = "Read repository setup and active runs")]
     Status,
-    #[usage(help = "Search selected Cortex knowledge")]
+    #[usage(help = "Search selected Brain knowledge")]
     Search(Search),
     #[usage(help = "Read a knowledge file with bounded line ranges")]
     Read(Read),
@@ -59,7 +59,7 @@ pub enum Command {
     Access(KnowledgeAccess),
     #[usage(help = "Recover repository setup and manage read-only Git credentials")]
     Repository(Repository),
-    #[usage(help = "Inspect or disconnect your apps in the selected Cortex")]
+    #[usage(help = "Inspect or disconnect your apps in the selected Brain")]
     Connections(Connections),
     #[usage(help = "Generate a retry ID before a create or record operation")]
     RequestId,
@@ -77,7 +77,7 @@ pub struct Completions {
 pub struct Login {
     #[usage(
         long,
-        help = "Skip automatic project selection when the account has exactly one Cortex"
+        help = "Skip automatic project selection when the account has exactly one Brain"
     )]
     pub no_select: bool,
     #[usage(
@@ -116,12 +116,12 @@ pub struct Name {
     pub name: String,
 }
 #[derive(Args)]
-pub struct Cortexes {
+pub struct Brains {
     #[usage(subcommand)]
-    pub command: CortexCommand,
+    pub command: BrainCommand,
 }
 #[derive(Subcommands)]
-pub enum CortexCommand {
+pub enum BrainCommand {
     List,
     Create(Create),
 }
@@ -130,13 +130,13 @@ pub struct Create {
     pub name: String,
     #[usage(
         long,
-        help = "Required durable retry ID; reuse with exactly the same name and original Cortex"
+        help = "Required durable retry ID; reuse with exactly the same name and original Brain"
     )]
     pub request_id: String,
 }
 #[derive(Args)]
 pub struct Select {
-    pub cortex_id: String,
+    pub brain_id: String,
 }
 #[derive(Args)]
 pub struct Knowledge {
@@ -232,7 +232,7 @@ pub struct Record {
     pub file: Option<String>,
     #[usage(
         long,
-        help = "Required durable retry ID; preserve input and Cortex on retries"
+        help = "Required durable retry ID; preserve input and Brain on retries"
     )]
     pub request_id: String,
     #[usage(

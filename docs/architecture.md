@@ -16,7 +16,7 @@ returned cursors and revision without choosing a backend itself.
 
 Login uses dynamic client registration, browser email sign-in and consent, authorization code with
 S256 PKCE, a random state, issuer verification, and an ephemeral IPv4 loopback callback. Requests
-use the existing account grant with explicit Cortex IDs. The OAuth resource remains
+use the existing account grant with explicit Brain IDs. The OAuth resource remains
 `<origin>/app/api/mcp`: it identifies the existing Cortex authorization audience shared by these
 transports. The CLI is a separately consented, inspectable, revocable connected app.
 
@@ -38,14 +38,14 @@ host's permission flow grants access without changing credential storage or file
 
 ## Selection and retries
 
-The selected Cortex is a project-local immutable Organization ID. Commands automatically use the
+The selected Brain is a project-local immutable Organization ID. Commands automatically use the
 current directory's `.cortex/config.toml`; `--project` targets another directory. There is no global
-selection. An explicit `--cortex` overrides the selection for one invocation. A missing, malformed,
+selection. An explicit `--brain` overrides the selection for one invocation. A missing, malformed,
 or JSON-only selection stops knowledge operations. No existing project files are migrated or
 rewritten on discovery. `use` performs verified atomic replacement and rollback under a project
 lock.
 
-Creation and recording require caller-owned retry IDs. Creating a Cortex does not switch the
+Creation and recording require caller-owned retry IDs. Creating a Brain does not switch the
 selection automatically. The agent skill performs the subsequent verified switch after creation is
 confirmed. This preserves the original assertion and request identity across lost responses. Running
 records continue through bounded waits, and successful process execution is distinct from a saved
@@ -53,7 +53,7 @@ receipt. Exact edits retain optimistic revision checks; the CLI never silently m
 them.
 
 After successful authentication, login selects the sole account membership if the project is
-unconfigured. `login --no-select` or a per-command `--cortex` skips this step. Existing selections
+unconfigured. `login --no-select` or a per-command `--brain` skips this step. Existing selections
 are preserved, including a selection saved during membership discovery. Automatic selection uses the
 same project lock, verification, readback, and rollback as `use`. Discovery and selection errors are
 returned in `data.selection` while `signed_in` remains true. Zero or multiple memberships leave the
@@ -81,8 +81,9 @@ separate future decisions.
 
 ## Naming compatibility
 
-Cortex reads legacy `.brain/config.toml` selections with `brain_id` when no Cortex selection exists.
-New selections write `.cortex/config.toml` with `cortex_id`. An invalid Cortex file stops the
-operation instead of falling back. Existing `BRAIN_HOME`, `BRAIN_ORIGIN`, and private `second-brain`
-credential directories remain usable; no files are automatically copied or rewritten. The service
-keeps existing OAuth scope strings and `/brains` route aliases for older clients.
+Cortex reads legacy `.brain/config.toml` selections with `brain_id` when no `.cortex` selection
+exists. New selections write `.cortex/config.toml` with `brain_id`. Existing `cortex_id` fields
+remain readable. An invalid `.cortex` file stops the operation instead of falling back. Existing
+`BRAIN_HOME`, `BRAIN_ORIGIN`, and private `second-brain` credential directories remain usable; no
+files are automatically copied or rewritten. The service keeps existing OAuth scope strings and
+accepts `/cortexes` as an alias for `/brains`.

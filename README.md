@@ -1,10 +1,10 @@
 # Cortex
 
-Your Cortex from the terminal, Codex, and Claude Code.
+Your Brain from the terminal, Codex, and Claude Code.
 
-Search shared knowledge, record what matters, switch Cortexes, and manage access through a small
-Rust CLI. Portable skills teach an agent how to choose the right Cortex, cite sources, finish
-onboarding, and recover from an uncertain save.
+Search shared knowledge, record what matters, switch Brains, and manage access through a small Rust
+CLI. Portable skills teach an agent how to choose the right Brain, cite sources, finish onboarding,
+and recover from an uncertain save.
 
 **Local evaluation preview.** Build and install from the files in this directory. No crate, binary
 release, marketplace, or npm package is published. The existing MCP and plugin integrations remain
@@ -67,15 +67,15 @@ to select another compatible service. This preview's backend adapter has not bee
 
 ```sh
 cortex login
-cortex cortexes list
+cortex brains list
 cortex use org_1234567890abcdef
 cortex whoami
 cortex search "release decisions"
 ```
 
-Use an ID returned by `cortexes list`. Login opens email sign-in and browser consent. It requests
-the existing knowledge, Cortex, account, and management permissions; the browser shows the consent
-and the server checks your current role on each operation. For read-only use:
+Use an ID returned by `brains list`. Login opens email sign-in and browser consent. It requests the
+existing knowledge, Brain, account, and management permissions; the browser shows the consent and
+the server checks your current role on each operation. For read-only use:
 
 ```sh
 cortex login --scopes "knowledge:read brains:access"
@@ -111,37 +111,37 @@ absolute path to `cortex`. Then ask:
 
 > Use the Cortex CLI to find our release decisions and cite the sources.
 
-> Create a Cortex called Field Notes, select it, and help me onboard it.
+> Create a Brain called Field Notes, select it, and help me onboard it.
 
 > Remember that launch approval belongs to the product lead.
 
-## Cortex selection
+## Brain selection
 
-The CLI and skills are installed globally for your user. Cortex selection stays in the current
+The CLI and skills are installed globally for your user. Brain selection stays in the current
 directory's `.cortex/config.toml`. Plain `cortex ...` commands automatically read and write this
 file:
 
 ```toml
-cortex_id = "org_1234567890abcdef"
+brain_id = "org_1234567890abcdef"
 ```
 
 `cortex use <id>` verifies access, atomically writes the file, reads it back, and verifies again. A
 failure restores the previous selection. `cortex config` shows the local configuration.
 
 - `--project` targets a different directory; the default is the current directory. There is no
-  global default Cortex. Parent directories are not searched, so a neighboring project cannot
-  silently select a Cortex.
-- `--cortex <id>` overrides the selection for one command without changing the file.
-- Login selects the account's only Cortex when the project has no configuration and access verifies
+  global default Brain. Parent directories are not searched, so a neighboring project cannot
+  silently select a Brain.
+- `--brain <id>` overrides the selection for one command without changing the file.
+- Login selects the account's only Brain when the project has no configuration and access verifies
   successfully. Use `cortex login --no-select` to opt out. Existing selections are preserved; zero
-  or multiple memberships require a choice with `cortex use`. An explicit `--cortex` on login also
+  or multiple memberships require a choice with `cortex use`. An explicit `--brain` on login also
   leaves saved configuration unchanged.
 - Login reports its selection outcome in `data.selection`. A discovery or verification failure
-  leaves you signed in and reports `selected: false` with an error; select a Cortex later with
+  leaves you signed in and reports `selected: false` with an error; select a Brain later with
   `cortex use`. Existing invalid TOML or JSON-only configuration is preserved for explicit recovery.
-- Creation returns a new Cortex but leaves selection unchanged. Run `cortex use <new-id>` after
+- Creation returns a new Brain but leaves selection unchanged. Run `cortex use <new-id>` after
   creation succeeds. This keeps creation retries attached to their original request context.
-- JSON selection is deferred. If only `.cortex/config.json` exists, select its intended Cortex with
+- JSON selection is deferred. If only `.cortex/config.json` exists, select its intended Brain with
   `cortex --project /path/to/project use <id>`; the JSON file is preserved. When both exist, this
   CLI uses TOML and MCP uses JSON. Keep them aligned intentionally while evaluating both transports.
 
@@ -176,7 +176,7 @@ binding. `knowledge read-many --file ranges.json` accepts up to eight
 
 Recording invokes the service's writing model, which selects files and commits validated knowledge.
 It waits up to 25 seconds by default. Only `status: saved` confirms a commit. Continue a running
-result with `runs get`, using the same Cortex ID. Preserve the request ID, original Cortex, content,
+result with `runs get`, using the same Brain ID. Preserve the request ID, original Brain, content,
 and attachment bytes on retries. `not_saved`, failed, and cancelled runs return a nonzero exit.
 `--wait 0` returns the submitted run immediately.
 
@@ -225,7 +225,7 @@ stderr. Help, version, specification, and completion commands return their nativ
   "data": { "status": "running", "runId": "run_1234567890abcdef" },
   "context": {
     "origin": "http://second-brain.localhost:1355",
-    "cortex_id": "org_1234567890abcdef",
+    "brain_id": "org_1234567890abcdef",
     "request_id": "chosen-stable-id"
   }
 }
@@ -266,12 +266,12 @@ service has separate real OAuth, role, and recording integration tests. See
 [architecture](docs/architecture.md) and [local testing](docs/testing.md).
 
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
-[Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Cortex selection,
+[Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
 durable knowledge recording, and Cortex's current access model.
 
 ## Scoped access
 
-Paths start at the Cortex repository root. `access show` and `access explain <path>` inspect current
+Paths start at the Brain repository root. `access show` and `access explain <path>` inspect current
 permissions. Management commands include `access scopes`, `access activate`, `access promote`,
 `access operations`, and `people access --file <json> [--preview]`. JSON mutations preserve their
 request ID, reason, and expected generation. Invitations require `--role` or `--policy-file` and

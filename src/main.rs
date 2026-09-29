@@ -25,11 +25,11 @@ fn run(args: Cortex) -> Result<Value> {
             | Command::Use(_)
             | Command::RequestId
             | Command::Account(_)
-            | Command::Cortexes(args::Cortexes {
-                command: args::CortexCommand::List
+            | Command::Brains(args::Brains {
+                command: args::BrainCommand::List
             })
     );
-    let selected = if let Some(id) = args.cortex {
+    let selected = if let Some(id) = args.brain {
         Some(config::identifier(&id, "org")?)
     } else if bypass_selection {
         None
@@ -41,8 +41,8 @@ fn run(args: Cortex) -> Result<Value> {
         | Command::Knowledge(args::Knowledge {
             command: args::KnowledgeCommand::Record(options),
         }) => Some(options.request_id.clone()),
-        Command::Cortexes(args::Cortexes {
-            command: args::CortexCommand::Create(options),
+        Command::Brains(args::Brains {
+            command: args::BrainCommand::Create(options),
         }) => Some(options.request_id.clone()),
         _ => None,
     };
@@ -53,7 +53,7 @@ fn run(args: Cortex) -> Result<Value> {
     };
     let result = context.execute(args.command);
     let metadata =
-        json!({"origin": origin, "cortex_id": context.selected, "request_id": request_id});
+        json!({"origin": origin, "brain_id": context.selected, "request_id": request_id});
     match result {
         Ok(data) => {
             let status = data.get("status").and_then(Value::as_str);
