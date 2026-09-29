@@ -55,6 +55,8 @@ pub enum Command {
     Runs(Runs),
     #[usage(help = "List people, invite members, and manage roles")]
     People(People),
+    #[usage(help = "Inspect, explain, and manage scoped knowledge access")]
+    Access(KnowledgeAccess),
     #[usage(help = "Recover repository setup and manage read-only Git credentials")]
     Repository(Repository),
     #[usage(help = "Inspect or disconnect your apps in the selected Brain")]
@@ -153,6 +155,9 @@ pub enum KnowledgeCommand {
     ReadMany(ReadMany),
     Record(Record),
     Replace(Replace),
+    Patch(Replace),
+    Move(MoveKnowledge),
+    DiscardMove(Replace),
     Attachment(Attachment),
 }
 #[derive(Args)]
@@ -177,6 +182,11 @@ pub struct Search {
     pub limit: u64,
     #[usage(long)]
     pub revision: Option<String>,
+    #[usage(
+        long,
+        help = "Opaque nextCursor from the previous page; preserve the query and revision"
+    )]
+    pub cursor: Option<String>,
 }
 #[derive(Args)]
 pub struct Grep {
@@ -191,6 +201,8 @@ pub struct Grep {
     pub limit: u64,
     #[usage(long)]
     pub revision: Option<String>,
+    #[usage(long, help = "Opaque nextCursor from the previous page")]
+    pub cursor: Option<String>,
 }
 #[derive(Args)]
 pub struct Read {
@@ -223,6 +235,11 @@ pub struct Record {
         help = "Required durable retry ID; preserve input and Brain on retries"
     )]
     pub request_id: String,
+    #[usage(
+        long,
+        help = "Explicit writable directory or file; required for restricted writers"
+    )]
+    pub target: Option<String>,
     #[usage(long, help = "Local attachment; repeat up to five times")]
     pub attachment: Vec<String>,
     #[usage(
@@ -234,10 +251,7 @@ pub struct Record {
 }
 #[derive(Args)]
 pub struct Replace {
-    #[usage(
-        long,
-        help = "JSON object with content, baseRevision, optional documents and summary; - for stdin"
-    )]
+    #[usage(long, help = "This operation's JSON request file; - reads stdin")]
     pub file: String,
 }
 #[derive(Args)]
@@ -282,12 +296,27 @@ pub enum PeopleCommand {
     Revoke(InvitationId),
     Role(ChangeRole),
     Transfer(Transfer),
+    Access(PolicyChange),
 }
 #[derive(Args)]
 pub struct Invite {
     pub email: String,
-    #[usage(long, choices("read", "write", "admin"), default = "read")]
-    pub role: String,
+    #[usage(
+        long,
+        choices("read", "write", "admin"),
+        help = "Explicit full access; supply this or --policy-file"
+    )]
+    pub role: Option<String>,
+    #[usage(
+        long,
+        help = "Custom access JSON: {kind: custom, default, rules}; use - for stdin"
+    )]
+    pub policy_file: Option<String>,
+    #[usage(
+        long,
+        help = "Durable retry ID; preserve the reviewed access choice on retries"
+    )]
+    pub request_id: String,
     #[usage(
         long,
         help = "Write a local development invitation link to a new private file"
@@ -297,6 +326,71 @@ pub struct Invite {
 #[derive(Args)]
 pub struct InvitationId {
     pub invitation_id: String,
+}
+
+#[derive(Args)]
+pub struct KnowledgeAccess {
+    #[usage(subcommand)]
+    pub command: KnowledgeAccessCommand,
+}
+#[derive(Subcommands)]
+pub enum KnowledgeAccessCommand {
+    Show(AccessMember),
+    Explain(AccessExplain),
+    Scopes(ScopeRegistration),
+    Operations,
+    Activate(AccessActivation),
+    Promote(Replace),
+}
+#[derive(Args)]
+pub struct AccessMember {
+    #[usage(long, help = "Inspect another member; requires Admin")]
+    pub user_id: Option<String>,
+}
+#[derive(Args)]
+pub struct AccessExplain {
+    pub path: String,
+    #[usage(long)]
+    pub user_id: Option<String>,
+}
+#[derive(Args)]
+pub struct ScopeRegistration {
+    #[usage(
+        long,
+        help = "Register using JSON {path, kind, label, reserve?, expectedGeneration, requestId, reason}; omit to list"
+    )]
+    pub file: Option<String>,
+}
+#[derive(Args)]
+pub struct PolicyChange {
+    #[usage(
+        long,
+        help = "JSON {userId, policy, expectedGeneration, requestId, reason}; - for stdin"
+    )]
+    pub file: String,
+    #[usage(
+        long,
+        help = "Preview without applying; requires only userId and policy"
+    )]
+    pub preview: bool,
+}
+#[derive(Args)]
+pub struct MoveKnowledge {
+    #[usage(
+        long,
+        help = "JSON {source, destination} for preview or {planId, requestId, reason} to apply"
+    )]
+    pub file: String,
+    #[usage(long, help = "Review exact file and binding changes without applying")]
+    pub preview: bool,
+}
+#[derive(Args)]
+pub struct AccessActivation {
+    #[usage(
+        long,
+        help = "Apply reviewed JSON {planId, reason, acceptLimitations: true}; omit to review history and Git credentials"
+    )]
+    pub file: Option<String>,
 }
 #[derive(Args)]
 pub struct ChangeRole {

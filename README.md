@@ -267,3 +267,18 @@ service has separate real OAuth, role, and recording integration tests. See
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
 [Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
 durable knowledge recording, and Second Brain's current access model.
+
+## Scoped access
+
+Paths start at the Brain repository root. `access show` and `access explain <path>` inspect current
+permissions. Management commands include `access scopes`, `access activate`, `access promote`,
+`access operations`, and `people access --file <json> [--preview]`. JSON mutations preserve their
+request ID, reason, and expected generation. Invitations require `--role` or `--policy-file` and
+`--request-id`.
+
+`knowledge patch --file <json>` accepts `{files, baseRevision, summary}`. Restricted recording uses
+`record --target <directory-or-file>`. Follow `nextCursor` with `--cursor` on search/grep. Moves use
+`knowledge move --file <json> --preview` and then the exact reviewed plan without `--preview`;
+`knowledge discard-move --file <json>` abandons an unapplied plan. Applied uncertain operations
+require private recovery. These commands add no authority beyond the service's current membership,
+file policy, and OAuth consent. This CLI remains a local evaluation release.

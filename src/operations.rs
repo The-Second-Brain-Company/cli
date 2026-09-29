@@ -87,6 +87,18 @@ impl Context {
             Command::Read(options) => self.read(options),
             Command::Record(options) => self.record(options),
             Command::Knowledge(options) => self.knowledge(options.command),
+            Command::Access(options) => match options.command {
+                KnowledgeAccessCommand::Show(options) => match options.user_id { Some(user) => self.get(&format!("/access/members/{}", config::identifier(&user, "usr")?)), None => self.get("/access") },
+                KnowledgeAccessCommand::Explain(options) => {
+                    let mut input = json!({"path": options.path});
+                    if let Some(user) = options.user_id { input["userId"] = json!(config::identifier(&user, "usr")?); }
+                    self.mutate(Method::POST, "/access/explain", input)
+                },
+                KnowledgeAccessCommand::Scopes(options) => match options.file { Some(file) => self.mutate(Method::POST, "/access/scopes", json_input(&file)?), None => self.get("/access/scopes") },
+                KnowledgeAccessCommand::Operations => self.get("/access/operations"),
+                KnowledgeAccessCommand::Activate(options) => match options.file { Some(file) => self.mutate(Method::POST, "/access/activation", json_input(&file)?), None => self.get("/access/activation") },
+                KnowledgeAccessCommand::Promote(options) => self.mutate(Method::POST, "/access/promote", json_input(&options.file)?),
+            },
             Command::Runs(options) => match options.command {
                 RunCommand::Get(options) => self.wait(&options.run_id, options.wait),
                 RunCommand::Cancel(options) => self.mutate(Method::POST, &format!("/runs/{}/cancel", config::identifier(&options.run_id, "run")?), json!({})),
@@ -94,8 +106,14 @@ impl Context {
             Command::People(options) => match options.command {
                 PeopleCommand::List => self.get("/people"),
                 PeopleCommand::Invite(options) => {
+                    request_id(&options.request_id)?;
+                    let access = match (options.role, options.policy_file) {
+                        (Some(role), None) => json!({"kind": role}),
+                        (None, Some(file)) => json_input(&file)?,
+                        _ => return Err(Error::invalid("Choose exactly one of --role read|write|admin or --policy-file; permissions are required")),
+                    };
                     let mut secret = options.secret_file.as_deref().map(|path| self.secret_file(path)).transpose()?;
-                    let response = self.mutate(Method::POST, "/invitations", json!({"email": options.email, "role": options.role}));
+                    let response = self.mutate(Method::POST, "/invitations", json!({"email": options.email, "access": access, "requestId": options.request_id}));
                     let mut result = match response { Ok(result) => result, Err(error) => {
                         if let Some(path) = &options.secret_file { let _ = fs::remove_file(path); }
                         return Err(error);
@@ -110,6 +128,14 @@ impl Context {
                 PeopleCommand::Revoke(options) => self.mutate(Method::DELETE, &format!("/invitations/{}", config::identifier(&options.invitation_id, "inv")?), json!({})),
                 PeopleCommand::Role(options) => self.mutate(Method::PATCH, &format!("/people/{}", config::identifier(&options.user_id, "usr")?), json!({"role": options.role})),
                 PeopleCommand::Transfer(options) => self.mutate(Method::PUT, "/ownership", json!({"userId": config::identifier(&options.user_id, "usr")?, "expectedOwnerId": config::identifier(&options.expected_owner, "usr")?})),
+                PeopleCommand::Access(options) => {
+                    let input = json_input(&options.file)?;
+                    if options.preview { self.mutate(Method::POST, "/access/preview", input) }
+                    else {
+                        let user = input.get("userId").and_then(Value::as_str).ok_or_else(|| Error::invalid("Policy input requires userId"))?;
+                        self.mutate(Method::PUT, &format!("/access/members/{}", config::identifier(user, "usr")?), input)
+                    }
+                },
             },
             Command::Connections(options) => match options.command {
                 ConnectionCommand::List => self.get("/connections"),
@@ -231,6 +257,23 @@ impl Context {
 
     fn knowledge(&self, command: KnowledgeCommand) -> Result<Value> {
         match command {
+            KnowledgeCommand::Patch(options) => {
+                self.mutate(Method::PATCH, "/knowledge", json_input(&options.file)?)
+            }
+            KnowledgeCommand::DiscardMove(options) => self.mutate(
+                Method::POST,
+                "/access/moves/discard",
+                json_input(&options.file)?,
+            ),
+            KnowledgeCommand::Move(options) => self.mutate(
+                Method::POST,
+                if options.preview {
+                    "/access/moves/plan"
+                } else {
+                    "/access/moves/apply"
+                },
+                json_input(&options.file)?,
+            ),
             KnowledgeCommand::Show => self.get("/knowledge"),
             KnowledgeCommand::Document(options) => {
                 let mut query = revision_query(options.revision.as_deref())?;
@@ -259,6 +302,9 @@ impl Context {
             KnowledgeCommand::Grep(options) => {
                 pagination(options.offset, options.limit)?;
                 let mut input = json!({"op": "grep", "pattern": options.pattern, "ignoreCase": !options.case_sensitive, "offset": options.offset, "limit": options.limit});
+                if let Some(cursor) = options.cursor {
+                    input["cursor"] = json!(cursor);
+                }
                 if let Some(path) = options.path {
                     input["path"] = json!(knowledge_path(&path, true)?);
                 }
@@ -333,6 +379,9 @@ impl Context {
     fn search(&self, options: Search) -> Result<Value> {
         pagination(options.offset, options.limit)?;
         let mut input = json!({"op": "search", "query": options.query, "offset": options.offset, "limit": options.limit});
+        if let Some(cursor) = options.cursor {
+            input["cursor"] = json!(cursor);
+        }
         if let Some(path) = options.path {
             input["path"] = json!(knowledge_path(&path, true)?);
         }
@@ -390,8 +439,11 @@ impl Context {
                 .ok_or_else(|| Error::invalid("Invalid attachment filename"))?;
             attachments.push(json!({"name": name, "data": STANDARD.encode(bytes)}));
         }
-        let input =
+        let mut input =
             json!({"info": info, "requestId": options.request_id, "attachments": attachments});
+        if let Some(target) = options.target {
+            input["target"] = json!(target);
+        }
         let mut result = self.mutate(Method::POST, "/knowledge/record", input)?;
         if options.wait > 0
             && let Some(run_id) = result.get("runId").and_then(Value::as_str)
@@ -426,6 +478,10 @@ fn pagination(offset: u64, limit: u64) -> Result<()> {
     }
     Ok(())
 }
+fn json_input(file: &str) -> Result<Value> {
+    Ok(serde_json::from_slice(&config::read_input(file, 98304)?)?)
+}
+
 fn knowledge_path(value: &str, directory: bool) -> Result<String> {
     if value == "/" && directory {
         return Ok(value.into());

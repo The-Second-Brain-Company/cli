@@ -661,6 +661,10 @@ fn authenticated_workflow_preserves_selection_retry_identity_and_secrets() {
         "people",
         "invite",
         "friend@example.com",
+        "--role",
+        "read",
+        "--request-id",
+        "invite-fixture",
         "--secret-file",
         invitation.to_str().unwrap(),
     ]);
