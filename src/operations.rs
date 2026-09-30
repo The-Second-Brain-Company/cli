@@ -7,6 +7,7 @@ use crate::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use reqwest::Method;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::Write,
@@ -257,6 +258,65 @@ impl Context {
 
     fn knowledge(&self, command: KnowledgeCommand) -> Result<Value> {
         match command {
+            KnowledgeCommand::Copy(options) => {
+                self.mutate(Method::POST, "/knowledge/copy", json_input(&options.file)?)
+            }
+            KnowledgeCommand::Upload(options) => {
+                request_id(&options.request_id)?;
+                revision_query(Some(&options.base_revision))?;
+                let bytes = config::read_input(&options.file, 5 * 1024 * 1024)?;
+                let name = Path::new(&options.file)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| Error::invalid("Invalid attachment filename"))?;
+                let mut input = json!({"path": options.path, "attachment": {"name": name, "data": STANDARD.encode(bytes)}, "mode": if options.replace {"replace"} else {"create"}, "baseRevision": options.base_revision, "requestId": options.request_id, "summary": options.summary});
+                if let Some(sources) = options.sources {
+                    input["sources"] = json_input(&sources)?;
+                }
+                self.mutate(Method::POST, "/knowledge/attachments", input)
+            }
+            KnowledgeCommand::Download(options) => {
+                let mut query = revision_query(options.revision.as_deref())?;
+                query.extend([("path", options.path), ("download", "base64".into())]);
+                let mut result = self.api.org(
+                    self.brain()?,
+                    Method::GET,
+                    "/knowledge/attachment",
+                    &query,
+                    None,
+                )?;
+                let encoded = result
+                    .get("data")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| Error::new("protocol", "Download did not contain file bytes"))?;
+                if encoded.len() > 4 * (5 * 1024 * 1024_usize).div_ceil(3) {
+                    return Err(Error::new("protocol", "Download exceeds 5 MiB"));
+                }
+                let bytes = STANDARD
+                    .decode(encoded)
+                    .map_err(|_| Error::new("protocol", "Invalid file encoding"))?;
+                let checksum = format!("{:x}", Sha256::digest(&bytes));
+                if result.get("sha256").and_then(Value::as_str) != Some(checksum.as_str())
+                    || result.get("byteCount").and_then(Value::as_u64) != Some(bytes.len() as u64)
+                {
+                    return Err(Error::new("protocol", "Download integrity check failed"));
+                }
+                let mut output = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&options.output)?;
+                if let Err(error) = output.write_all(&bytes).and_then(|()| output.sync_all()) {
+                    drop(output);
+                    let _ = fs::remove_file(&options.output);
+                    return Err(error.into());
+                }
+                result
+                    .as_object_mut()
+                    .ok_or_else(|| Error::new("protocol", "Invalid download result"))?
+                    .remove("data");
+                result["output"] = json!(options.output);
+                Ok(result)
+            }
             KnowledgeCommand::Patch(options) => {
                 self.mutate(Method::PATCH, "/knowledge", json_input(&options.file)?)
             }
@@ -441,6 +501,9 @@ impl Context {
         }
         let mut input =
             json!({"info": info, "requestId": options.request_id, "attachments": attachments});
+        if let Some(sources) = options.sources {
+            input["sources"] = json_input(&sources)?;
+        }
         if let Some(target) = options.target {
             input["target"] = json!(target);
         }

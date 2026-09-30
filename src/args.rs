@@ -159,6 +159,9 @@ pub enum KnowledgeCommand {
     Move(MoveKnowledge),
     DiscardMove(Replace),
     Attachment(Attachment),
+    Download(Download),
+    Upload(Upload),
+    Copy(Replace),
 }
 #[derive(Args)]
 pub struct Document {
@@ -244,6 +247,11 @@ pub struct Record {
     pub attachment: Vec<String>,
     #[usage(
         long,
+        help = "JSON array of retained source paths and revisions to extract"
+    )]
+    pub sources: Option<String>,
+    #[usage(
+        long,
         default = "25",
         help = "Seconds to wait for the initial durable result (0-25)"
     )]
@@ -263,6 +271,33 @@ pub struct Attachment {
     pub start_line: u64,
     #[usage(long, default = "200")]
     pub limit: u64,
+}
+#[derive(Args)]
+pub struct Download {
+    pub path: String,
+    #[usage(long)]
+    pub revision: Option<String>,
+    #[usage(long, help = "New local output file; existing files are preserved")]
+    pub output: String,
+}
+#[derive(Args)]
+pub struct Upload {
+    pub path: String,
+    #[usage(long)]
+    pub file: String,
+    #[usage(long)]
+    pub base_revision: String,
+    #[usage(long)]
+    pub request_id: String,
+    #[usage(long)]
+    pub summary: String,
+    #[usage(long, help = "Explicitly replace an existing attachment")]
+    pub replace: bool,
+    #[usage(
+        long,
+        help = "JSON array of Cortex source paths and revisions used in this file"
+    )]
+    pub sources: Option<String>,
 }
 #[derive(Args)]
 pub struct Runs {

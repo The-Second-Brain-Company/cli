@@ -202,6 +202,30 @@ impl Fixture {
                             200,
                             json!({"revision": "a".repeat(40), "query": input, "results": [{"path": "policy.md", "snippet": "Fixture policy"}]}),
                         )
+                    } else if path.ends_with("/knowledge/attachment") {
+                        let bytes = [0_u8, 1, 255, 0];
+                        let name = url
+                            .query_pairs()
+                            .find(|(key, _)| key == "path")
+                            .unwrap()
+                            .1
+                            .into_owned();
+                        let checksum = if name.ends_with("corrupt.bin") {
+                            "bad".into()
+                        } else {
+                            format!("{:x}", Sha256::digest(bytes))
+                        };
+                        (
+                            200,
+                            json!({"path": name, "revision": "a".repeat(40), "data": "AAH/AA==", "byteCount": 4, "sha256": checksum}),
+                        )
+                    } else if path.ends_with("/knowledge/attachments")
+                        || path.ends_with("/knowledge/copy")
+                    {
+                        (
+                            200,
+                            json!({"path": input["path"], "revision": "b".repeat(40)}),
+                        )
                     } else if path.ends_with("/knowledge/record") {
                         (202, json!({"runId": RUN, "status": "running"}))
                     } else if path.ends_with(&format!("/runs/{RUN}")) {
@@ -377,6 +401,77 @@ fn decode(output: Output) -> (i32, Value) {
         )
     });
     (output.status.code().unwrap(), value)
+}
+
+#[test]
+fn attachments_download_whole_files_and_verify_integrity_without_overwriting_local_work() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    let output = fixture.root.path().join("template.docx");
+    let path = "deliverables/_attachments/template.docx";
+    let args = [
+        "knowledge",
+        "download",
+        path,
+        "--output",
+        output.to_str().unwrap(),
+    ];
+    let (code, result) = fixture.run(&args);
+    assert_eq!(code, 0, "{result}");
+    assert_eq!(fs::read(&output).unwrap(), [0, 1, 255, 0]);
+    assert!(result["data"].get("data").is_none());
+    assert_eq!(
+        fixture
+            .state
+            .lock()
+            .unwrap()
+            .requests
+            .iter()
+            .filter(|(_, path, _)| path.ends_with("/knowledge/attachment"))
+            .count(),
+        1
+    );
+    assert_ne!(fixture.run(&args).0, 0);
+    assert_eq!(fs::read(&output).unwrap(), [0, 1, 255, 0]);
+    let corrupt = fixture.root.path().join("corrupt.bin");
+    assert_ne!(
+        fixture
+            .run(&[
+                "knowledge",
+                "download",
+                "finance/_attachments/corrupt.bin",
+                "--output",
+                corrupt.to_str().unwrap()
+            ])
+            .0,
+        0
+    );
+    assert!(!corrupt.exists());
+    let revision = "a".repeat(40);
+    let (code, result) = fixture.run(&[
+        "knowledge",
+        "upload",
+        path,
+        "--file",
+        output.to_str().unwrap(),
+        "--base-revision",
+        &revision,
+        "--request-id",
+        "upload-template",
+        "--summary",
+        "Save template",
+    ]);
+    assert_eq!(code, 0, "{result}");
+    let state = fixture.state.lock().unwrap();
+    let input = &state
+        .requests
+        .iter()
+        .find(|(_, path, _)| path.ends_with("/knowledge/attachments"))
+        .unwrap()
+        .2;
+    assert_eq!(input["attachment"]["data"], "AAH/AA==");
+    assert_eq!(input["baseRevision"], revision);
+    assert_eq!(input["mode"], "create");
 }
 
 #[test]

@@ -163,7 +163,7 @@ cortex knowledge show
 cortex request-id
 cortex record --file facts.md --request-id chosen-stable-id
 cortex record --file - --request-id another-stable-id < facts.md
-cortex record --file facts.md --attachment notes.csv --request-id import-stable-id
+cortex record --file facts.md --attachment notes.csv --target finance --request-id import-stable-id
 cortex runs get run_1234567890abcdef --wait 25
 ```
 
@@ -183,8 +183,10 @@ and attachment bytes on retries. `not_saved`, failed, and cancelled runs return 
 For exact requested edits, `knowledge replace --file change.json` accepts `content`, `baseRevision`,
 and optional `documents` and `summary`. Read current content first and merge after a revision
 conflict. Normal fact recording needs no manual placement or preflight read. Attachments are
-processed transiently; the service retains extracted knowledge and source receipts. PDF and Office
-extraction remains deferred.
+retained in domain-local `_attachments/` before optional extraction. Specify `--target` when
+recording local uploads, or `--sources sources.json` for saved `[{path, revision}]` references.
+Backend PDF and Office extraction remains unsupported; client document tools can process those
+formats.
 
 ## People and access
 
@@ -283,3 +285,22 @@ request ID, reason, and expected generation. Invitations require `--role` or `--
 `knowledge discard-move --file <json>` abandons an unapplied plan. Applied uncertain operations
 require private recovery. These commands add no authority beyond the service's current membership,
 file policy, and OAuth consent. This CLI remains a local evaluation release.
+
+## Retained files and templates
+
+```sh
+cortex knowledge upload deliverables/_attachments/report.docx --file report.docx --base-revision REVISION --request-id save-template --summary 'Save report template'
+cortex knowledge copy --file copy.json
+cortex knowledge download projects/atlas/_attachments/report.docx --revision REVISION --output report-local.docx
+cortex knowledge upload projects/atlas/_attachments/report.docx --file report-local.docx --replace --base-revision REVISION --request-id fill-report --summary 'Fill Atlas report' --sources sources.json
+```
+
+`copy.json` supplies `source: {path, revision}`, destination `path`, `baseRevision`, `requestId`,
+and `summary`. Use actual full revisions. Copy supports attachments and Markdown templates. Uploads
+preserve bytes and allow 5 MiB per file. Downloads use one authenticated request, verify byte count
+and SHA-256, and refuse to overwrite existing local files. Replacement preserves known source
+restrictions and adds references from `sources.json`. Reuse identical arguments and the request ID
+after uncertainty; private receipt recovery resolves an ambiguous commit.
+
+CLI and skills remain local evaluation distributions. File operations use shared service access
+checks. Binary editing depends on the client's document tools.
