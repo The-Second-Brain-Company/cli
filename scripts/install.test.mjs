@@ -5,8 +5,53 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { createHash } from "node:crypto";
 
 const installer = fileURLToPath(new URL("./install.sh", import.meta.url));
+
+test("release installation verifies downloaded bytes before replacement", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cortex-release-install-"));
+  try {
+    const bin = join(root, "tools");
+    const destination = join(root, "installed");
+    await mkdir(bin);
+    const artifact = join(root, "artifact");
+    await binary(artifact, "0.2.0");
+    await writeFile(
+      join(bin, "uname"),
+      '#!/bin/sh\nif [ "$1" = -s ]; then printf Darwin; else printf arm64; fi\n',
+      { mode: 0o755 },
+    );
+    await writeFile(
+      join(bin, "curl"),
+      '#!/bin/sh\nfor argument in "$@"; do previous="${current:-}"; current="$argument"; done\ncase "$previous" in --output) destination="$current";; *) exit 1;; esac\ncase "$destination" in *.sha256) cp "$RELEASE_CHECKSUM" "$destination";; *) cp "$RELEASE_BINARY" "$destination";; esac\n',
+      { mode: 0o755 },
+    );
+    const checksum = join(root, "checksum");
+    const digest = createHash("sha256")
+      .update(await readFile(artifact))
+      .digest("hex");
+    await writeFile(checksum, `${digest}  cortex-aarch64-apple-darwin\n`);
+    const run = () =>
+      spawnSync("bash", [installer, "--release"], {
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          BIN_DIR: destination,
+          RELEASE_BINARY: artifact,
+          RELEASE_CHECKSUM: checksum,
+        },
+        encoding: "utf8",
+      });
+    assert.equal(run().status, 0);
+    const original = await readFile(join(destination, "cortex"));
+    await binary(artifact, "0.2.0-tampered");
+    assert.notEqual(run().status, 0);
+    assert.deepEqual(await readFile(join(destination, "cortex")), original);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 async function binary(path, version) {
   await writeFile(path, `#!/bin/sh\nprintf '%s\\n' 'cortex ${version}'\n`, { mode: 0o755 });

@@ -691,7 +691,14 @@ fn login_preserves_legacy_or_invalid_project_configuration() {
         fs::write(directory.join(name), &content).unwrap();
         let result = fixture.login(&[]);
         assert_eq!(result["data"]["selection"]["selected"], false);
-        assert_eq!(result["data"]["selection"]["reason"], "failed");
+        assert_eq!(
+            result["data"]["selection"]["reason"],
+            if name == "config.json" {
+                "already_selected"
+            } else {
+                "failed"
+            }
+        );
         assert_eq!(fs::read_to_string(directory.join(name)).unwrap(), content);
         if name == "config.json" {
             assert!(!directory.join("config.toml").exists());
@@ -903,7 +910,7 @@ fn parsing_config_and_stdin_are_predictable_without_authentication() {
         format!("{{\"brain_id\":\"{FIRST}\"}}"),
     )
     .unwrap();
-    assert_eq!(fixture.run(&["config"]).0, 2);
+    assert_eq!(fixture.run(&["config"]).0, 0);
     fs::write(directory.join("config.toml"), "brain_id = 'invalid'\n").unwrap();
     assert_eq!(fixture.run(&["config"]).0, 2);
     assert_eq!(fixture.run(&["--brain", FIRST, "config"]).0, 0);

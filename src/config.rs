@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const DEFAULT_ORIGIN: &str = "http://second-brain.localhost:1355";
+pub const DEFAULT_ORIGIN: &str = "https://www.thesecondbrain.company";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -63,24 +63,48 @@ pub fn selected(project: &Path) -> Result<Option<String>> {
     } else {
         project.join(".brain")
     };
-    let path = directory.join("config.toml");
+    let toml = directory.join("config.toml");
+    let path = if toml.exists() {
+        toml
+    } else {
+        directory.join("config.json")
+    };
     if !path.exists() {
-        if directory.join("config.json").exists() {
-            return Err(Error::new(
-                "config",
-                "This project has only plugin JSON selection. Select its intended Brain explicitly with cortex use to save CLI configuration.",
-            ));
-        }
         return Ok(None);
     }
-    let raw = fs::read_to_string(path)?;
-    let selection: Selection = toml::from_str(&raw).map_err(|_| {
-        Error::new(
+    reject_symlink(&directory)?;
+    reject_symlink(&path)?;
+    let raw = fs::read_to_string(&path)?;
+    let value: serde_json::Value = if path.extension().is_some_and(|ext| ext == "json") {
+        serde_json::from_str(&raw)
+            .map_err(|_| Error::new("config", "Invalid Brain selection JSON"))?
+    } else {
+        let value: toml::Value = toml::from_str(&raw)
+            .map_err(|_| Error::new("config", "Invalid Brain selection TOML"))?;
+        serde_json::to_value(value)?
+    };
+    let object = value
+        .as_object()
+        .ok_or_else(|| Error::new("config", "Expected a Brain selection object"))?;
+    if object
+        .keys()
+        .any(|key| key != "brain_id" && key != "cortex_id")
+    {
+        return Err(Error::new(
             "config",
-            "Invalid .cortex/config.toml; expected only brain_id = \"org_...\"",
-        )
-    })?;
-    Ok(Some(identifier(&selection.brain_id, "org")?))
+            "Brain selection accepts only brain_id and legacy cortex_id",
+        ));
+    }
+    let current = object.get("brain_id");
+    let legacy = object.get("cortex_id");
+    if current.is_some() && legacy.is_some() && current != legacy {
+        return Err(Error::new("config", "Brain selection aliases disagree"));
+    }
+    let id = current
+        .or(legacy)
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| Error::new("config", "Brain selection requires brain_id"))?;
+    Ok(Some(identifier(id, "org")?))
 }
 
 pub fn auth_dir() -> Result<PathBuf> {

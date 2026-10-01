@@ -1,23 +1,18 @@
 # Cortex CLI development
 
-Use mise tasks from this directory. Rust commands run through pinned Rust and mr-boxington; Usage
-owns command parsing, help, and completions. Keep dependency versions exact and commit Cargo.lock.
+Use the pinned mise tasks from this directory. Keep the Rust package independently buildable when
+mirrored, with exact dependencies and Cargo.lock. Keep code free of comments; put rationale in
+Markdown. Run test, fmt, and fmt-check before committing.
 
-Keep this repository independently buildable when mirrored. Use `src/` for Rust, `tests/` for
-integration tests, and `scripts/` for installation tooling. Portable agent skills are maintained in
-a separate repository; never depend on its checkout or the private service repository to build,
-test, or install this CLI. Keep code free of comments; put rationale in Markdown. Use Oxfmt for
-Markdown and configuration and rustfmt for Rust.
+The CLI is the preferred local agent interface and is distributed alongside complete Codex and
+Claude plugins. Preserve surface parity through shared service handlers and authorization. Read
+[architecture](docs/architecture.md) when changing authentication, project selection, retry
+handling, or installation. The CLI reads the working directory's .cortex/config.toml itself and
+supplies the Brain ID. TOML is preferred; JSON is read compatibility. Keep credentials per user and
+origin, outside projects. Verify switches with rollback and preserve original Brain/request IDs for
+retries.
 
-This CLI is a side project; Cortex development prioritizes remote MCP and plugin distribution for
-ChatGPT/Codex and Claude. Implement new product capabilities in this CLI as well, using the shared
-service handlers and authorization. Keep CLI-specific expansion and public distribution secondary.
-
-This is a local evaluation release. Cargo publishing is disabled; keep binary, crate, plugin,
-marketplace, and website publication out of these tasks. Existing MCP packages remain unchanged. Run
-`mise run test`, `mise run fmt`, and `mise run fmt-check` before committing. The service repository
-separately tests its CLI adapter and OAuth authorization.
-
-CLI operations use the service's shared OAuth, role checks, and product handlers. Keep Brain
-selection verified, credentials outside projects, retry IDs stable, and saved claims tied to durable
-receipts. The private operator boundary remains separate.
+Development installation uses current working files. Public releases use the service repository's
+pinned build and website publication tasks after tests and a commit; Cargo publishing stays
+disabled. Portable skills remain an independent mirror and complete plugins bundle their CLI
+workflow. Keep private operator recovery separate.

@@ -41,9 +41,8 @@ host's permission flow grants access without changing credential storage or file
 The selected Brain is a project-local immutable Organization ID. Commands automatically use the
 current directory's `.cortex/config.toml`; `--project` targets another directory. There is no global
 selection. An explicit `--brain` overrides the selection for one invocation. A missing, malformed,
-or JSON-only selection stops knowledge operations. No existing project files are migrated or
-rewritten on discovery. `use` performs verified atomic replacement and rollback under a project
-lock.
+selection stops knowledge operations. No existing project files are migrated or rewritten on
+discovery. `use` performs verified atomic replacement and rollback under a project lock.
 
 Creation and recording require caller-owned retry IDs. Creating a Brain does not switch the
 selection automatically. The agent skill performs the subsequent verified switch after creation is
@@ -57,16 +56,16 @@ unconfigured. `login --no-select` or a per-command `--brain` skips this step. Ex
 are preserved, including a selection saved during membership discovery. Automatic selection uses the
 same project lock, verification, readback, and rollback as `use`. Discovery and selection errors are
 returned in `data.selection` while `signed_in` remains true. Zero or multiple memberships leave the
-project unconfigured. Invalid or JSON-only configuration requires explicit recovery with `use`.
+project unconfigured. Invalid configuration requires explicit recovery with `use`.
 
-## Local evaluation boundary
+## Installation and release
 
 Development installation builds the current working files with the pinned Cargo toolchain, reads the
 executable path from Cargo's build output, and passes it to `scripts/install.sh --from-file`. That
 shared installation step validates a temporary executable and atomically replaces
-`~/.local/bin/cortex`, or `BIN_DIR/cortex` when configured. The future production download path must
-use the same destination and replacement step so either version can replace the other. Binary
-installation keeps credentials and project selections intact.
+`~/.local/bin/cortex`, or `BIN_DIR/cortex` when configured. The production download path uses the
+same destination and replacement step so either version can replace the other. Binary installation
+keeps credentials and project selections intact.
 
 The service adapter adds transport aliases for current operations. It adds no role, management
 scope, data store, migration, or public operator API. Browser and MCP results keep their existing
@@ -74,10 +73,13 @@ contracts. WebSocket streaming is intentionally outside this command/response CL
 provide inspection and waiting. Public waitlist signup and email/invitation acceptance stay in the
 browser bootstrap flow. Retired conversations and Virtual operations remain unavailable.
 
-This preview is explicitly local. Cargo has `publish = false`; there are no release/upload tasks.
-The existing Codex and Claude plugin manifests, skill packages, public website, and production
-infrastructure are unchanged. Removing public MCP access and running CLI-versus-MCP model evals are
-separate future decisions.
+The service repository builds official macOS/Linux arm64 and x86_64 binaries with pinned Rust and a
+digest-pinned Linux container, then publishes them through the Public Website after checks and a
+commit. The installer verifies checksums before atomic replacement. The CLI default origin is the
+canonical production service; local evaluation chooses its origin explicitly. Cargo publishing stays
+disabled. Complete Codex and Claude plugins bundle the portable CLI workflow, so normal installs
+need no separate global skill. The fallback MCP audience selects one Brain during OAuth consent; CLI
+authentication remains account-wide for per-directory selection.
 
 ## Naming compatibility
 
@@ -87,3 +89,7 @@ remain readable. An invalid `.cortex` file stops the operation instead of fallin
 `BRAIN_HOME`, `BRAIN_ORIGIN`, and private `second-brain` credential directories remain usable; no
 files are automatically copied or rewritten. The service keeps existing OAuth scope strings and
 accepts `/cortexes` as an alias for `/brains`.
+
+The preferred project format is TOML. When only JSON exists it remains readable; TOML takes
+precedence within the selected .cortex or .brain directory. Conflicting brain_id/cortex_id aliases
+or invalid preferred configuration stop access. cortex use always writes verified TOML.

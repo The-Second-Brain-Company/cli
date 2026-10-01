@@ -48,16 +48,17 @@ and match pagination, partial failures, pinned ranges, and the selected Sandbox 
    origin is `http://second-brain.localhost:1355`.
 3. Use `/admin/` to invite a test user if needed. Accept the development invitation link in the
    browser and complete or skip the personal name. Operator login remains separate.
-4. In an evaluation directory, run the locally installed `cortex login`. Complete browser sign-in
-   and consent. Local delivery returns a masked link in the browser; no email is sent.
+4. In an evaluation directory, run `cortex --origin http://second-brain.localhost:1355 login`.
+   Complete browser sign-in and consent. Local delivery returns a masked link in the browser; no
+   email is sent.
 5. Login selects your only Brain when the directory has no saved selection. Use
    `cortex login --no-select` to opt out. Check `cortex config`; if nothing is selected, run
    `cortex brains list`, then `cortex use <id>`. To create a Brain, get an ID with
    `cortex request-id`, run `cortex brains create "Evaluation" --request-id <id>`, and select the
    returned Organization ID with `cortex use`.
-6. Install the skill globally, restart or reload the harness's instructions if needed, and give it
-   the installed binary's PATH. Ask it to record synthetic facts and retrieve them with citations.
-   Inspect People and Connected apps in the browser to compare outcomes.
+6. Install the complete deployed plugin, restart or reload the harness's instructions if needed, and
+   give it the installed binary's PATH. Ask it to record synthetic facts and retrieve them with
+   citations. Inspect People and Connected apps in the browser to compare outcomes.
 7. Use `cortex logout` when finished. Remove test Brains only through tracked admin cleanup. Do not
    wipe local databases or remove provider repositories manually.
 
@@ -76,5 +77,6 @@ in the copy. It needs no skills checkout or service source. Authenticated operat
 compatible Cortex service.
 
 The skills repository has its own README, mise tasks, and installer and can be copied and tested
-separately. Mirror the two repositories independently. The preview has no public distribution
-pipeline; `scripts/install.sh` installs CLI source locally and is the future public redirect target.
+separately. Mirror the two repositories independently. Official releases use the service
+repository's build-cli-release and website pipeline; this mirror retains local installation and the
+shared --release/--from-file installer.

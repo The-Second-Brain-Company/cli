@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  printf '%s\n' 'Usage: install.sh [--from-file PATH]' '' 'Build and install current working files, or install an existing Cortex executable.' 'BIN_DIR sets the destination directory (default: ~/.local/bin).'
+  printf '%s\n' 'Usage: install.sh [--release | --from-file PATH]' '' 'Install the official release, build current working files, or install an existing Cortex executable.' 'BIN_DIR sets the destination directory (default: ~/.local/bin).'
   exit 0
 fi
 
@@ -42,8 +42,37 @@ if [[ "${1:-}" == "--from-file" && "$#" == 2 ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "--release" && "$#" == 1 ]]; then
+  release_version="0.2.0"
+  case "$(uname -s):$(uname -m)" in
+    Darwin:arm64) platform="aarch64-apple-darwin" ;;
+    Darwin:x86_64) platform="x86_64-apple-darwin" ;;
+    Linux:aarch64|Linux:arm64) platform="aarch64-unknown-linux-gnu" ;;
+    Linux:x86_64|Linux:amd64) platform="x86_64-unknown-linux-gnu" ;;
+    *) printf '%s\n' 'No CLI release for this platform. Use the Cortex plugin MCP connection.' >&2; exit 1 ;;
+  esac
+  release_url="https://www.thesecondbrain.company/cli/releases/$release_version"
+  download_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$download_dir"' EXIT
+  curl --fail --show-error --silent --location "$release_url/cortex-$platform" --output "$download_dir/cortex-$platform"
+  curl --fail --show-error --silent --location "$release_url/cortex-$platform.sha256" --output "$download_dir/cortex-$platform.sha256"
+  if command -v sha256sum >/dev/null 2>&1; then
+    (cd -- "$download_dir" && sha256sum --check "cortex-$platform.sha256")
+  else
+    (cd -- "$download_dir" && shasum --algorithm 256 --check "cortex-$platform.sha256")
+  fi
+  chmod 755 "$download_dir/cortex-$platform"
+  installed_version="$("$download_dir/cortex-$platform" --version)"
+  if [[ "$installed_version" != "cortex $release_version" ]]; then
+    printf '%s\n' 'The downloaded CLI does not match the release version.' >&2
+    exit 1
+  fi
+  bash "${BASH_SOURCE[0]}" --from-file "$download_dir/cortex-$platform"
+  exit 0
+fi
+
 if [[ "$#" != 0 ]]; then
-  printf '%s\n' 'Usage: install.sh [--from-file PATH]' >&2
+  printf '%s\n' 'Usage: install.sh [--release | --from-file PATH]' >&2
   exit 2
 fi
 

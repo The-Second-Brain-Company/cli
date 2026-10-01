@@ -6,10 +6,19 @@ Search shared knowledge, record what matters, switch Brains, and manage access t
 CLI. Portable skills teach an agent how to choose the right Brain, cite sources, finish onboarding,
 and recover from an uncertain save.
 
-**Side project, local evaluation preview.** Cortex development prioritizes remote MCP and plugin
-distribution for ChatGPT/Codex and Claude. New product capabilities are implemented in this CLI as
-well; CLI-specific expansion and public distribution remain secondary. Build and install from the
-files in this directory. No crate, binary release, marketplace, or npm package is published.
+The CLI is the preferred interface for local agents. Complete Codex and Claude plugins bundle its
+workflow and a Brain-bound MCP fallback for hosted clients. Official binaries are distributed
+through https://www.thesecondbrain.company/cli/install.sh for macOS and Linux arm64/x86_64. Linux
+requires glibc 2.36 or later. Cargo publishing is disabled; developer builds remain independently
+usable.
+
+## Install the release
+
+Download the installer to a temporary file, run bash install.sh --release, and verify cortex
+--version. It checks SHA-256 and atomically replaces ~/.local/bin/cortex while preserving
+credentials and project configuration. Put that directory on the agent's PATH. Complete plugins
+install a missing compatible CLI on first use; no separate skill or customer AGENTS.md edit is
+needed.
 
 ## Quick start
 
@@ -32,11 +41,10 @@ downloads the locked third-party dependencies on the first build. Subsequent bui
 [mr-boxington](https://github.com/jdx/mr-boxington) through mise's Rust integration. The tool
 versions are pinned in `mise.toml`.
 
-`~/.local/bin/cortex` is the shared installation location for development builds and future
-production releases. Either installer replaces the current binary there; no uninstall or Cargo
-registration is needed. The installer verifies the replacement before moving it into place.
-Authentication and project configuration live elsewhere and are preserved. Set `BIN_DIR` to use a
-different directory:
+`~/.local/bin/cortex` is the shared installation location for development builds and production
+releases. Either installer replaces the current binary there; no uninstall or Cargo registration is
+needed. The installer verifies the replacement before moving it into place. Authentication and
+project configuration live elsewhere and are preserved. Set `BIN_DIR` to use a different directory:
 
 ```sh
 BIN_DIR="$PWD/.local/bin" mise run install
@@ -47,24 +55,11 @@ first on PATH, the installer reports it. Keep the shared installation directory 
 used by your terminal and agent. From the full Cortex repository root, `mise run install-cli` runs
 this same development installation.
 
-After `mise trust` and `mise install`, you can also run `bash scripts/install.sh` from this
-directory. The script belongs to this repository. The future public `/install-cli` entry point will
-redirect to its raw GitHub URL once the CLI mirror and public distribution are configured. During
-local evaluation, piping the script requires `CORTEX_CLI_SOURCE_DIR` to point at an existing CLI
-checkout:
-
-```sh
-cat scripts/install.sh | CORTEX_CLI_SOURCE_DIR="$PWD" bash
-```
-
-To install an executable already built on disk, run
-`bash scripts/install.sh --from-file /absolute/path/to/cortex`. This uses the same replacement step
-without rebuilding. Public release downloads remain deferred during local evaluation.
-
-Start a Cortex service with CLI support. In the full Cortex checkout, run `mise run dev` from its
-root, following its existing local service setup. The CLI defaults to
-`http://second-brain.localhost:1355`. Use `--origin https://your-service.example` or `CORTEX_ORIGIN`
-to select another compatible service. This preview's backend adapter has not been deployed publicly.
+After mise trust and mise install, bash scripts/install.sh builds from this directory. Use
+--from-file /absolute/path/to/cortex for an existing binary or --release for the official download.
+Both use the same atomic replacement step. The default service origin is
+https://www.thesecondbrain.company. For local evaluation pass --origin
+http://second-brain.localhost:1355 explicitly or set CORTEX_ORIGIN.
 
 ```sh
 cortex login
@@ -87,34 +82,12 @@ for the browser callback. Keep that process alive. Credentials are stored privat
 there is no token copy/paste step. See [local testing](docs/testing.md) for setup and test
 boundaries.
 
-## Add the skill
+## Agent workflow
 
-The agent skills live in an independent Cortex skills repository with its own installer. From that
-repository directory, install them globally for your user:
-
-```sh
-mise trust
-mise install
-mise run install
-```
-
-This copies the current skill, references, and logo to `~/.agents/skills/cortex` for Codex and
-`~/.claude/skills/cortex` for Claude Code. It works from any directory without project instruction
-files. Update both copies with `mise run install -- --replace` after editing the skill. From the
-full Cortex repository root, use `mise run install-cli-skills -- --replace`.
-
-Project-only skill installation remains available with `--project /path/to/your/project`; see the
-skills repository's README for that fallback and supported environments. Both repositories build,
-install, and test independently.
-
-Make `~/.local/bin` (or your `BIN_DIR`) available on the agent process's PATH, or give it the
-absolute path to `cortex`. Then ask:
-
-> Use the Cortex CLI to find our release decisions and cite the sources.
-
-> Create a Brain called Field Notes, select it, and help me onboard it.
-
-> Remember that launch approval belongs to the product lead.
+Install the complete Cortex plugin through https://www.thesecondbrain.company/llms.txt. It bundles
+the CLI workflow maintained in the independent cli/skills mirror; standalone skill installation is
+for isolated evaluation and should not shadow an installed plugin. Keep the binary on PATH and ask
+Cortex to retrieve or record knowledge. Read the plugin's CLI references for setup and management.
 
 ## Brain selection
 
@@ -139,12 +112,12 @@ failure restores the previous selection. `cortex config` shows the local configu
   leaves saved configuration unchanged.
 - Login reports its selection outcome in `data.selection`. A discovery or verification failure
   leaves you signed in and reports `selected: false` with an error; select a Brain later with
-  `cortex use`. Existing invalid TOML or JSON-only configuration is preserved for explicit recovery.
+  `cortex use`. Existing invalid configuration is preserved for explicit recovery.
 - Creation returns a new Brain but leaves selection unchanged. Run `cortex use <new-id>` after
   creation succeeds. This keeps creation retries attached to their original request context.
-- JSON selection is deferred. If only `.cortex/config.json` exists, select its intended Brain with
+- JSON selection remains readable compatibility; preferred TOML takes precedence. Select with
   `cortex --project /path/to/project use <id>`; the JSON file is preserved. When both exist, this
-  CLI uses TOML and MCP uses JSON. Keep them aligned intentionally while evaluating both transports.
+  CLI uses TOML. MCP uses its OAuth grant and does not inspect either project file.
 
 Account credentials live in `$CORTEX_HOME`, `$XDG_CONFIG_HOME/cortex`, or `~/.config/cortex`, in
 that order. Set `CORTEX_HOME` to a private directory outside projects for isolated testing.
@@ -285,7 +258,7 @@ request ID, reason, and expected generation. Invitations require `--role` or `--
 `knowledge move --file <json> --preview` and then the exact reviewed plan without `--preview`;
 `knowledge discard-move --file <json>` abandons an unapplied plan. Applied uncertain operations
 require private recovery. These commands add no authority beyond the service's current membership,
-file policy, and OAuth consent. This CLI remains a local evaluation release.
+file policy, and OAuth consent. The CLI uses the same product authorization as browser and MCP.
 
 ## Retained files and templates
 
@@ -303,5 +276,5 @@ and SHA-256, and refuse to overwrite existing local files. Replacement preserves
 restrictions and adds references from `sources.json`. Reuse identical arguments and the request ID
 after uncertainty; private receipt recovery resolves an ambiguous commit.
 
-CLI and skills remain local evaluation distributions. File operations use shared service access
-checks. Binary editing depends on the client's document tools.
+Complete plugins bundle the CLI workflow and official binary installer guidance. File operations use
+shared service access checks. Binary editing depends on the client's document tools.
