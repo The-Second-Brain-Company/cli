@@ -6,9 +6,10 @@ Search shared knowledge, record what matters, switch Brains, and manage access t
 CLI. Portable skills teach an agent how to choose the right Brain, cite sources, finish onboarding,
 and recover from an uncertain save.
 
-**Local evaluation preview.** Build and install from the files in this directory. No crate, binary
-release, marketplace, or npm package is published. The existing MCP and plugin integrations remain
-available.
+**Side project, local evaluation preview.** Cortex development prioritizes remote MCP and plugin
+distribution for ChatGPT/Codex and Claude. New product capabilities are implemented in this CLI as
+well; CLI-specific expansion and public distribution remain secondary. Build and install from the
+files in this directory. No crate, binary release, marketplace, or npm package is published.
 
 ## Quick start
 

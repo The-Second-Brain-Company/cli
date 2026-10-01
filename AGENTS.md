@@ -9,6 +9,10 @@ a separate repository; never depend on its checkout or the private service repos
 test, or install this CLI. Keep code free of comments; put rationale in Markdown. Use Oxfmt for
 Markdown and configuration and rustfmt for Rust.
 
+This CLI is a side project; Cortex development prioritizes remote MCP and plugin distribution for
+ChatGPT/Codex and Claude. Implement new product capabilities in this CLI as well, using the shared
+service handlers and authorization. Keep CLI-specific expansion and public distribution secondary.
+
 This is a local evaluation release. Cargo publishing is disabled; keep binary, crate, plugin,
 marketplace, and website publication out of these tasks. Existing MCP packages remain unchanged. Run
 `mise run test`, `mise run fmt`, and `mise run fmt-check` before committing. The service repository
