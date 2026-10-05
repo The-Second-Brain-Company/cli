@@ -43,7 +43,7 @@ if [[ "${1:-}" == "--from-file" && "$#" == 2 ]]; then
 fi
 
 if [[ "${1:-}" == "--release" && "$#" == 1 ]]; then
-  release_version="0.2.0"
+  release_version="0.2.1"
   case "$(uname -s):$(uname -m)" in
     Darwin:arm64) platform="aarch64-apple-darwin" ;;
     Darwin:x86_64) platform="x86_64-apple-darwin" ;;

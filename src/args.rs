@@ -43,6 +43,8 @@ pub enum Command {
     Whoami,
     #[usage(help = "Read repository setup and active runs")]
     Status,
+    #[usage(help = "Show the shared recording allowance and its renewal time")]
+    RecordingAllowance,
     #[usage(help = "Search selected Brain knowledge")]
     Search(Search),
     #[usage(help = "Read a knowledge file with bounded line ranges")]

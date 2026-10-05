@@ -193,6 +193,11 @@ impl Fixture {
                                 json!({"organization": {"id": id, "name": "Fixture"}, "role": "owner"}),
                             )
                         }
+                    } else if path.ends_with("/recording-allowance") {
+                        (
+                            200,
+                            json!({"status": "available", "remainingPercent": 72, "resetsAt": 1793491200000_u64}),
+                        )
                     } else if path.ends_with("/knowledge/retrieve") {
                         let input: Value = serde_json::from_str(
                             &url.query_pairs().find(|(key, _)| key == "input").unwrap().1,
@@ -728,6 +733,64 @@ fn login_preserves_a_selection_saved_during_cortex_discovery() {
         format!("brain_id = '{SECOND}'\n")
     );
     assert_eq!(fixture.state.lock().unwrap().verification_count, 0);
+}
+
+#[test]
+fn recording_allowance_uses_selection_and_preserves_the_public_projection() {
+    let fixture = Fixture::new();
+    fixture.login(&["--no-select"]);
+    let missing = fixture.run(&["recording-allowance"]);
+    assert_eq!(missing.0, 2);
+    assert_eq!(missing.1["error"]["code"], "config");
+    assert!(
+        missing.1["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("cortex use <id>")
+    );
+    assert!(
+        !fixture
+            .state
+            .lock()
+            .unwrap()
+            .requests
+            .iter()
+            .any(|(_, path, _)| path.ends_with("/recording-allowance"))
+    );
+    assert_eq!(fixture.run(&["use", FIRST]).0, 0);
+    let config_path = fixture.root.path().join("project/.cortex/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    let expected =
+        json!({"status": "available", "remainingPercent": 72, "resetsAt": 1793491200000_u64});
+    for (args, brain) in [
+        (vec!["recording-allowance"], FIRST),
+        (vec!["--brain", SECOND, "recording-allowance"], SECOND),
+    ] {
+        let result = fixture.run(&args);
+        assert_eq!(result.0, 0);
+        assert_eq!(result.1["context"]["brain_id"], brain);
+        assert_eq!(result.1["data"], expected);
+        assert!(
+            fixture
+                .state
+                .lock()
+                .unwrap()
+                .requests
+                .iter()
+                .any(|(method, path, body)| {
+                    method == "GET"
+                        && path == &format!("/app/api/cli/orgs/{brain}/recording-allowance")
+                        && body.is_null()
+                })
+        );
+    }
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), config);
+    let extra = fixture
+        .command()
+        .args(["recording-allowance", "extra"])
+        .output()
+        .unwrap();
+    assert!(!extra.status.success());
 }
 
 #[test]

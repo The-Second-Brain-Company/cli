@@ -16,7 +16,7 @@ test("release installation verifies downloaded bytes before replacement", async 
     const destination = join(root, "installed");
     await mkdir(bin);
     const artifact = join(root, "artifact");
-    await binary(artifact, "0.2.0");
+    await binary(artifact, "0.2.1");
     await writeFile(
       join(bin, "uname"),
       '#!/bin/sh\nif [ "$1" = -s ]; then printf Darwin; else printf arm64; fi\n',
@@ -45,7 +45,7 @@ test("release installation verifies downloaded bytes before replacement", async 
       });
     assert.equal(run().status, 0);
     const original = await readFile(join(destination, "cortex"));
-    await binary(artifact, "0.2.0-tampered");
+    await binary(artifact, "0.2.1-tampered");
     assert.notEqual(run().status, 0);
     assert.deepEqual(await readFile(join(destination, "cortex")), original);
   } finally {

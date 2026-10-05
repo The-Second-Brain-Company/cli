@@ -67,6 +67,7 @@ impl Context {
             Command::Logout => auth::logout(&self.api.origin),
             Command::RequestId => Ok(json!({"request_id": uuid::Uuid::new_v4().to_string()})),
             Command::Config => Ok(json!({"project": self.project, "brain_id": self.selected, "origin": self.api.origin})),
+            Command::RecordingAllowance => self.get("/recording-allowance"),
             Command::Account(options) => match options.command {
                 AccountCommand::Show => self.api.get("/account"),
                 AccountCommand::Profile(options) => self.api.request(Method::PATCH, "/profile", &[], Some(&json!({"name": options.name}))),
