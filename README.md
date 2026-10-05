@@ -264,6 +264,11 @@ the compiled binary against a synthetic HTTP/OAuth service; the Cortex service h
 OAuth, role, and recording integration tests. See [architecture](docs/architecture.md) and
 [local testing](docs/testing.md).
 
+After every commit changing `cli/cli` or `cli/skills`, publish both sibling mirrors from `repo/`
+with `mise run publish-cli-mirrors`. The main repository's installed post-commit hook runs this
+automatically and verifies both remote `master` heads. If publication fails, resolve the failure and
+rerun the task before considering the work complete. Never edit or create commits in a mirror.
+
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
 [Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
 durable knowledge recording, and Cortex's current access model.
