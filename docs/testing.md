@@ -2,12 +2,12 @@
 
 ## Tests without accounts or publishing
 
-From the CLI directory:
+From the main `repo/` checkout:
 
 ```sh
 mise install
-mise run test
-BIN_DIR="$PWD/.local/bin" mise run install
+mise run test-cli
+BIN_DIR="$PWD/.local/bin" mise run install-cli
 mise run fmt-check
 ```
 
@@ -18,15 +18,15 @@ failures, failed-switch rollback, selection from the current working directory, 
 and one-time secret files. Fixtures contain synthetic identities and knowledge and do not call a
 model or external storage. Compressed-response fixtures cover Brotli and gzip across OAuth login,
 refresh, search results, and service permission errors. Skill installation is tested independently
-in the Cortex skills repository.
+through `mise run test-cli-skills` against `repo/cli/skills`.
 
 Installer tests replace development and release fixtures in the same temporary directory, preserve
 the previous executable when a replacement fails validation, and cover existing symlinks and paths
 with spaces. The `BIN_DIR` override above keeps this test installation inside the repository. For
-normal use, `mise run install` installs the current files, including uncommitted edits, into
+normal use, `mise run install-cli` installs the current files, including uncommitted edits, into
 `~/.local/bin/cortex`. Repeat it after changes; a separate source copy or commit is unnecessary.
 
-From the full service repository root:
+From `repo/`, also run:
 
 ```sh
 mise run test-cli-api
@@ -69,14 +69,17 @@ Commands automatically respect the current directory's `.cortex/config.toml`. Us
 browser must be able to reach that loopback callback on the CLI's machine. A network sandbox may
 need permission for the listener and service connection.
 
-## Mirror check
+## Public mirror boundary
 
-Everything needed to build, install, and test the CLI is inside this repository. Copy the repository
-without `.local/`, `target/`, or credential/configuration directories, then run the same mise tasks
-in the copy. It needs no skills checkout or service source. Authenticated operations still need a
-compatible Cortex service.
+All maintained source and release work stays in `repo/`. The sibling `cli` and `skills` repositories
+are public publishing mirrors for source discovery and raw GitHub content links. Never develop or
+create commits there. The mirrored packages retain their own README, mise tasks, and installers so
+consumers can use them independently. CLI builds need no skills checkout or service source;
+authenticated operations still need a compatible Cortex service.
 
-The skills repository has its own README, mise tasks, and installer and can be copied and tested
-separately. Mirror the two repositories independently. Official releases use the service
-repository's build-cli-release and website pipeline; this mirror retains local installation and the
-shared --release/--from-file installer.
+Official releases use `mise run build-cli-release` and the website pipeline from `repo/`. The
+installer defaults to published binaries and supports stdin, `--release`, `--from-file`, and
+explicit `--source` installation. Installer tests exercise all four platform mappings, latest and
+pinned versions, checksum and executable-version failures, and preservation of installed files. Run
+`mise run test-cli-mirrors` from `repo/` to verify signed synchronization and destination
+protection.

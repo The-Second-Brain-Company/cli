@@ -14,30 +14,52 @@ usable.
 
 ## Install the release
 
-Download the installer to a temporary file, run bash install.sh --release, and verify cortex
---version. It checks SHA-256 and atomically replaces ~/.local/bin/cortex while preserving
-credentials and project configuration. Put that directory on the agent's PATH. Complete plugins
-install a missing compatible CLI on first use; no separate skill or customer AGENTS.md edit is
-needed.
+Run this from any directory on macOS or Linux:
+
+```sh
+curl -fsSL https://www.thesecondbrain.company/cli/install.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
+cortex --version
+```
+
+The public mirror exposes the same self-contained installer, like Basecamp:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/The-Second-Brain-Company/cli/master/scripts/install.sh | bash
+```
+
+Both commands download the latest published binary without Rust, mise, or a source checkout. The
+installer checks SHA-256 and the executable's version before atomically replacing
+`~/.local/bin/cortex`. It preserves credentials and project configuration. Set `BIN_DIR` for another
+destination. To install a specific available release, set the version on the interpreter:
+
+```sh
+curl -fsSL https://www.thesecondbrain.company/cli/install.sh | CORTEX_VERSION=0.2.1 bash
+```
+
+Saving the installer and running `bash install.sh` or `bash install.sh --release` has the same
+behavior. Complete plugins install a missing compatible CLI on first use; no separate skill or
+customer AGENTS.md edit is needed.
 
 ## Quick start
 
-Install [mise](https://mise.jdx.dev/) 2026.9.2 or newer, then run these commands from this
-directory:
+Do all development in the main `repo/` checkout. This public CLI repository is a mirror for
+distribution and raw GitHub content, not a development checkout. The source is `repo/cli/cli`.
+Install [mise](https://mise.jdx.dev/) 2026.9.2 or newer, then run these commands from `repo/`:
 
 ```sh
 mise trust
 mise install
-mise run test
-mise run install
+mise run test-cli
+mise run install-cli
 export PATH="$HOME/.local/bin:$PATH"
 cortex --help
 ```
 
-`mise run install` builds the files in this existing repository directory, including saved,
-uncommitted changes, in release mode and installs `cortex` at `~/.local/bin/cortex`. Rerun it after
-editing the CLI. It copies the built executable, so changes take effect after reinstalling. Cargo
-downloads the locked third-party dependencies on the first build. Subsequent builds use
+`mise run install-cli` builds the files in `repo/cli/cli`, including saved, uncommitted changes, in
+release mode and installs `cortex` at `~/.local/bin/cortex`. Rerun it after editing the CLI. It
+copies the built executable, so changes take effect after reinstalling. Cargo downloads the locked
+third-party dependencies on the first build. Subsequent builds use
 [mr-boxington](https://github.com/jdx/mr-boxington) through mise's Rust integration. The tool
 versions are pinned in `mise.toml`.
 
@@ -47,18 +69,17 @@ needed. The installer verifies the replacement before moving it into place. Auth
 project configuration live elsewhere and are preserved. Set `BIN_DIR` to use a different directory:
 
 ```sh
-BIN_DIR="$PWD/.local/bin" mise run install
+BIN_DIR="$PWD/.local/bin" mise run install-cli
 ```
 
 Use the same `BIN_DIR` for both installers when switching versions. If an earlier installation is
 first on PATH, the installer reports it. Keep the shared installation directory first on the PATH
-used by your terminal and agent. From the full Cortex repository root, `mise run install-cli` runs
-this same development installation.
+used by your terminal and agent.
 
-After mise trust and mise install, bash scripts/install.sh builds from this directory. Use
---from-file /absolute/path/to/cortex for an existing binary or --release for the official download.
-Both use the same atomic replacement step. The default service origin is
-https://www.thesecondbrain.company. For local evaluation pass --origin
+After `mise trust` and `mise install`, `bash cli/cli/scripts/install.sh --source` builds the current
+working files from `repo/`. Use `--from-file /absolute/path/to/cortex` for an existing binary or no
+arguments for the official download. All modes use the same atomic replacement step. The default
+service origin is https://www.thesecondbrain.company. For local evaluation pass --origin
 http://second-brain.localhost:1355 explicitly or set CORTEX_ORIGIN.
 
 ```sh
@@ -85,9 +106,10 @@ boundaries.
 ## Agent workflow
 
 Install the complete Cortex plugin through https://www.thesecondbrain.company/llms.txt. It bundles
-the CLI workflow maintained in the independent cli/skills mirror; standalone skill installation is
-for isolated evaluation and should not shadow an installed plugin. Keep the binary on PATH and ask
-Cortex to retrieve or record knowledge. Read the plugin's CLI references for setup and management.
+the CLI workflow maintained in `repo/cli/skills` and published to the skills mirror; standalone
+skill installation is for isolated evaluation and should not shadow an installed plugin. Keep the
+binary on PATH and ask Cortex to retrieve or record knowledge. Read the plugin's CLI references for
+setup and management.
 
 ## Brain selection
 
@@ -229,17 +251,18 @@ cortex completions zsh
 ## Development
 
 ```sh
-mise run build
-mise run test
+mise run build-cli
+mise run test-cli
 mise run fmt
 mise run fmt-check
 ```
 
-`src/` contains the Rust binary, `tests/` contains integration tests, and `scripts/install.sh` is
-the installation entry point. This repository contains its own build, test, and installation
-tooling. Rust tests run the compiled binary against a synthetic HTTP/OAuth service; the Cortex
-service has separate real OAuth, role, and recording integration tests. See
-[architecture](docs/architecture.md) and [local testing](docs/testing.md).
+Run these commands from `repo/`. `cli/cli/src/` contains the Rust binary, `cli/cli/tests/` contains
+integration tests, and `cli/cli/scripts/install.sh` is the installation entry point. The public
+mirror retains self-contained build, test, and installation tooling for consumers. Rust tests run
+the compiled binary against a synthetic HTTP/OAuth service; the Cortex service has separate real
+OAuth, role, and recording integration tests. See [architecture](docs/architecture.md) and
+[local testing](docs/testing.md).
 
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
 [Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
