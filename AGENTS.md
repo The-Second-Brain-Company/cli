@@ -24,7 +24,7 @@ retries.
 Development installation uses current working files through `mise run install-cli` or the explicit
 `scripts/install.sh --source` mode. The installer defaults to the latest published binary and must
 work through stdin without a checkout, Rust, or mise. Public releases use the main repository's
-pinned build and website publication tasks after tests and a commit; Cargo publishing stays
-disabled. Publish committed source to both public mirrors after every relevant commit. Complete
-plugins bundle the portable CLI workflow maintained under `repo/cli/skills`. Keep private operator
-recovery separate.
+pinned build and GitHub release publication tasks after tests, a commit, mirror publication, and
+signoff; Cargo publishing stays disabled. Publish committed source to both public mirrors after
+every relevant commit. Complete plugins bundle the portable CLI workflow maintained under
+`repo/cli/skills`. Keep private operator recovery separate.

@@ -77,9 +77,10 @@ create commits there. The mirrored packages retain their own README, mise tasks,
 consumers can use them independently. CLI builds need no skills checkout or service source;
 authenticated operations still need a compatible Cortex service.
 
-Official releases use `mise run build-cli-release` and the website pipeline from `repo/`. The
-installer defaults to published binaries and supports stdin, `--release`, `--from-file`, and
-explicit `--source` installation. Installer tests exercise all four platform mappings, latest and
-pinned versions, checksum and executable-version failures, and preservation of installed files. Run
+Official releases use `mise run build-cli-release` and `mise run publish-cli-release` from `repo/`.
+Run them after checks, a commit, mirror publication, and signoff. The installer defaults to
+published binaries and supports stdin, `--release`, `--from-file`, and explicit `--source`
+installation. Installer tests exercise all four platform mappings, latest and pinned versions,
+checksum and executable-version failures, and preservation of installed files. Run
 `mise run test-cli-mirrors` from `repo/` to verify signed synchronization and destination
 protection.

@@ -95,7 +95,7 @@ esac
 if [[ "${CORTEX_VERSION+x}" == x ]]; then
   release_version="$CORTEX_VERSION"
 else
-  release_version="$(curl --fail --show-error --silent --location https://www.thesecondbrain.company/cli/latest.txt)"
+  release_version="$(curl --fail --show-error --silent --location https://github.com/The-Second-Brain-Company/cli/releases/latest/download/latest.txt)"
 fi
 version_core='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
 prerelease_identifier='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
@@ -105,7 +105,7 @@ if [[ ! "$release_version" =~ $version_pattern ]]; then
   exit 1
 fi
 
-release_url="https://www.thesecondbrain.company/cli/releases/$release_version"
+release_url="https://github.com/The-Second-Brain-Company/cli/releases/download/v$release_version"
 download_dir="$(mktemp -d)"
 curl --fail --show-error --silent --location "$release_url/cortex-$platform" --output "$download_dir/cortex-$platform"
 curl --fail --show-error --silent --location "$release_url/cortex-$platform.sha256" --output "$download_dir/cortex-$platform.sha256"

@@ -269,6 +269,12 @@ with `mise run publish-cli-mirrors`. The main repository's installed post-commit
 automatically and verifies both remote `master` heads. If publication fails, resolve the failure and
 rerun the task before considering the work complete. Never edit or create commits in a mirror.
 
+For a public binary release, run `mise run build-cli-release` and `mise run publish-cli-release`
+from the clean, committed main checkout after the mirror heads and signoff are verified. The release
+publisher checks the exact signed public CLI commit and publishes four binaries, their checksums,
+`release.json`, and `latest.txt` as one GitHub release. A retry resumes a matching draft or verifies
+a completed release without replacing published assets.
+
 The design takes inspiration from [Basecamp for agents](https://basecamp.com/agents) and
 [Basecamp's skills](https://github.com/basecamp/skills), adapted to verified Brain selection,
 durable knowledge recording, and Cortex's current access model.

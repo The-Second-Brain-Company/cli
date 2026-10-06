@@ -76,16 +76,17 @@ browser bootstrap flow. Retired conversations and Virtual operations remain unav
 The main `repo/` checkout owns all CLI development, testing, builds, and release work under
 `cli/cli`; the sibling `cli` and `skills` repositories are public mirrors for discovery and raw
 GitHub content links. The main repository builds official macOS/Linux arm64 and x86_64 binaries with
-pinned Rust and a digest-pinned Linux container, then publishes them through the Public Website
-after checks and a commit. Its publisher verifies the complete platform set and all checksums before
-publishing the latest version pointer. No-argument installation reads `/cli/latest.txt` and works
-through stdin, including from the raw GitHub mirror, without a checkout or toolchain.
-`CORTEX_VERSION` pins an available release. `--source` explicitly requests a working-file build. The
-installer verifies checksums and the executable's version before atomic replacement. The CLI default
-origin is the canonical production service; local evaluation chooses its origin explicitly. Cargo
-publishing stays disabled. Complete Codex and Claude plugins bundle the portable CLI workflow, so
-normal installs need no separate global skill. The fallback MCP audience selects one Brain during
-OAuth consent; CLI authentication remains account-wide for per-directory selection.
+pinned Rust and a digest-pinned Linux container, then publishes them in a GitHub release on the
+exact signed public CLI mirror commit. Its publisher verifies the committed build inputs, complete
+platform set, and all checksums before publishing the release and its `latest.txt` asset.
+No-argument installation reads the latest GitHub release's `latest.txt` and works through stdin,
+including from the raw GitHub mirror, without a checkout or toolchain. `CORTEX_VERSION` pins an
+available release. `--source` explicitly requests a working-file build. The installer verifies
+checksums and the executable's version before atomic replacement. The CLI default origin is the
+canonical production service; local evaluation chooses its origin explicitly. Cargo publishing stays
+disabled. Complete Codex and Claude plugins bundle the portable CLI workflow, so normal installs
+need no separate global skill. The fallback MCP audience selects one Brain during OAuth consent; CLI
+authentication remains account-wide for per-directory selection.
 
 ## Naming compatibility
 

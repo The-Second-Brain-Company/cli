@@ -9,7 +9,8 @@ import { test } from "node:test";
 
 const installer = fileURLToPath(new URL("./install.sh", import.meta.url));
 const installerText = await readFile(installer, "utf8");
-const latestUrl = "https://www.thesecondbrain.company/cli/latest.txt";
+const latestUrl =
+  "https://github.com/The-Second-Brain-Company/cli/releases/latest/download/latest.txt";
 
 async function temporaryRoot(t) {
   const root = await mkdtemp(join(tmpdir(), "cortex-install-"));
@@ -44,7 +45,7 @@ async function releaseFixture(
   const downloads = join(root, "downloads");
   const requests = join(root, "requests");
   const artifact = join(root, "artifact");
-  const binaryUrl = `https://www.thesecondbrain.company/cli/releases/${version}/cortex-${platform}`;
+  const binaryUrl = `https://github.com/The-Second-Brain-Company/cli/releases/download/v${version}/cortex-${platform}`;
   await mkdir(tools);
   await mkdir(downloads);
   await writeFile(requests, "");
