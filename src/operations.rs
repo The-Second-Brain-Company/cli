@@ -359,6 +359,26 @@ impl Context {
                 None,
             ),
             KnowledgeCommand::Revision => self.get("/knowledge/revision"),
+            KnowledgeCommand::Review(options) => {
+                let mut query = revision_query(options.revision.as_deref())?;
+                query.push((
+                    "path",
+                    knowledge_path(&options.path, false)?
+                        .trim_start_matches('/')
+                        .into(),
+                ));
+                if let Some(before) = options.before {
+                    revision_query(Some(&before))?;
+                    query.push(("beforeRevision", before));
+                }
+                self.api.org(
+                    self.brain()?,
+                    Method::GET,
+                    "/knowledge/review",
+                    &query,
+                    None,
+                )
+            }
             KnowledgeCommand::Search(options) => self.search(options),
             KnowledgeCommand::Links(options) => {
                 pagination(options.offset, options.limit)?;

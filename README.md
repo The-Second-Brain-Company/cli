@@ -154,6 +154,7 @@ cortex knowledge list
 cortex search "pricing approval" --limit 20
 cortex search "margin" --type metric --status stable --tag finance
 cortex knowledge links finance/margin.md --direction incoming --revision <sha>
+cortex knowledge review finance/margin.md --revision <saved-sha> --before <base-sha>
 cortex read pricing.md --start-line 1 --limit 200
 cortex knowledge grep "approved" --path decisions
 cortex knowledge document ORGANIZATION.md
@@ -176,6 +177,13 @@ passed. Recorded verification is a declaration, not authenticated approval.
 revision citation URLs. Follow `--cursor` or `--offset` even after an empty page, retaining the
 path, direction, and revision. `knowledge read-many --file ranges.json` accepts up to eight
 `{"path":"file.md","startLine":1,"limit":200}` objects in an array.
+
+CLI 0.4.0 adds `knowledge review PATH`, with optional `--revision` and `--before`. It returns exact
+saved evidence, available earlier evidence, review-date status, and up to four readable
+pinned-source comparisons. Unavailable history does not establish a new file. Changed sources or
+passed dates do not establish incorrect knowledge. Follow its `linkedDocuments` descriptor with
+`knowledge links`. Review writes nothing; request a correction through `record` or make an explicit
+current-base patch.
 
 Recording invokes the service's writing model, which selects files and commits validated knowledge.
 It waits up to 25 seconds by default. Only `status: saved` confirms a commit. Continue a running

@@ -154,6 +154,8 @@ pub enum KnowledgeCommand {
     Search(Search),
     Grep(Grep),
     Links(Links),
+    #[usage(help = "Review saved evidence, review dates, and pinned source versions")]
+    Review(Review),
     Read(Read),
     ReadMany(ReadMany),
     Record(Record),
@@ -171,6 +173,14 @@ pub struct Document {
     pub path: String,
     #[usage(long)]
     pub revision: Option<String>,
+}
+#[derive(Args)]
+pub struct Review {
+    pub path: String,
+    #[usage(long)]
+    pub revision: Option<String>,
+    #[usage(long, help = "Earlier Git revision from the save receipt")]
+    pub before: Option<String>,
 }
 #[derive(Args)]
 pub struct Revision {

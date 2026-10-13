@@ -19,6 +19,42 @@ const SECOND: &str = "org_2222222222222222";
 const RUN: &str = "run_1111111111111111";
 
 #[test]
+fn review_preserves_both_revisions_and_rejects_invalid_revision_before_network() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    let revision = "b".repeat(40);
+    let before = "a".repeat(40);
+    let (code, result) = fixture.run(&[
+        "knowledge",
+        "review",
+        "finance/margin.md",
+        "--revision",
+        &revision,
+        "--before",
+        &before,
+    ]);
+    assert_eq!(code, 0, "{result}");
+    assert_eq!(
+        result["data"]["query"],
+        json!({"path":"finance/margin.md", "revision":revision, "beforeRevision":before})
+    );
+    let requests = fixture.state.lock().unwrap().requests.len();
+    assert_ne!(
+        fixture
+            .run(&[
+                "knowledge",
+                "review",
+                "finance/margin.md",
+                "--before",
+                "latest"
+            ])
+            .0,
+        0
+    );
+    assert_eq!(fixture.state.lock().unwrap().requests.len(), requests);
+}
+
+#[test]
 fn metadata_search_and_links_forward_filters_and_pinned_continuation() {
     let fixture = Fixture::new();
     fixture.login(&[]);
@@ -306,6 +342,12 @@ impl Fixture {
                             200,
                             json!({"status": "available", "remainingPercent": 72, "resetsAt": 1793491200000_u64}),
                         )
+                    } else if path.ends_with("/knowledge/review") {
+                        let query: serde_json::Map<String, Value> = url
+                            .query_pairs()
+                            .map(|(key, value)| (key.into_owned(), json!(value)))
+                            .collect();
+                        (200, json!({"query":query, "before":{"kind":"unavailable"}}))
                     } else if path.ends_with("/knowledge/retrieve") {
                         let input: Value = serde_json::from_str(
                             &url.query_pairs().find(|(key, _)| key == "input").unwrap().1,
