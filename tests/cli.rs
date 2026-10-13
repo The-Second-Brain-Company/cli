@@ -19,6 +19,114 @@ const SECOND: &str = "org_2222222222222222";
 const RUN: &str = "run_1111111111111111";
 
 #[test]
+fn metadata_search_and_links_forward_filters_and_pinned_continuation() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    let revision = "a".repeat(40);
+    let (code, search) = fixture.run(&[
+        "knowledge",
+        "search",
+        "margin",
+        "--type",
+        "metric",
+        "--status",
+        "deprecated",
+        "--tag",
+        "finance",
+        "--cursor",
+        "previous",
+        "--revision",
+        &revision,
+    ]);
+    assert_eq!(code, 0, "{search}");
+    assert_eq!(
+        search["data"]["query"],
+        json!({"op": "search", "query": "margin", "type": "metric", "status": "deprecated", "tag": "finance", "cursor": "previous", "offset": 0, "limit": 20})
+    );
+    assert_eq!(search["data"]["requestedRevision"], revision);
+    assert_eq!(
+        search["data"]["results"][0]["metadata"]["verified"]["scope"]["revision"],
+        "b".repeat(40)
+    );
+    assert_eq!(
+        search["data"]["results"][0]["metadata"]["verified"]["scope"]["path"],
+        "prior.md"
+    );
+    assert!(
+        search["data"]["results"][0]["metadata"]["verified"]["scope"]
+            .get("source_url")
+            .is_none()
+    );
+    let (code, links) = fixture.run(&[
+        "knowledge",
+        "links",
+        "finance/margin.md",
+        "--direction",
+        "incoming",
+        "--revision",
+        &revision,
+        "--cursor",
+        "previous",
+        "--limit",
+        "7",
+    ]);
+    assert_eq!(code, 0, "{links}");
+    assert_eq!(
+        links["data"]["query"],
+        json!({"op": "links", "path": "/finance/margin.md", "direction": "incoming", "cursor": "previous", "offset": 0, "limit": 7})
+    );
+    assert_eq!(links["data"]["requestedRevision"], revision);
+    assert_eq!(links["data"]["links"][0]["stale"], true);
+    assert_eq!(links["data"]["nextCursor"], "next-page");
+    assert!(
+        links["data"]["links"][0]["source_url"]
+            .as_str()
+            .unwrap()
+            .ends_with(&format!("revision={revision}"))
+    );
+    let before = fixture.state.lock().unwrap().requests.len();
+    assert_ne!(
+        fixture
+            .run(&[
+                "knowledge",
+                "links",
+                "finance/margin.md",
+                "--direction",
+                "both"
+            ])
+            .0,
+        0
+    );
+    assert_ne!(
+        fixture
+            .run(&[
+                "knowledge",
+                "links",
+                "../private.md",
+                "--direction",
+                "incoming"
+            ])
+            .0,
+        0
+    );
+    assert_ne!(
+        fixture
+            .run(&[
+                "knowledge",
+                "links",
+                "finance/margin.md",
+                "--direction",
+                "incoming",
+                "--revision",
+                "main"
+            ])
+            .0,
+        0
+    );
+    assert_eq!(fixture.state.lock().unwrap().requests.len(), before);
+}
+
+#[test]
 fn cortex_reads_legacy_selection_and_credentials_without_migrating_them() {
     let fixture = Fixture::new();
     fixture.login(&["--no-select"]);
@@ -203,10 +311,14 @@ impl Fixture {
                             &url.query_pairs().find(|(key, _)| key == "input").unwrap().1,
                         )
                         .unwrap();
-                        (
-                            200,
-                            json!({"revision": "a".repeat(40), "query": input, "results": [{"path": "policy.md", "snippet": "Fixture policy"}]}),
-                        )
+                        let entries = json!([{"path": "policy.md", "title": "Declared policy", "snippet": "Fixture policy", "metadata": {"status": "deprecated", "verified": {"by": "Analyst", "scope": {"revision": "b".repeat(40), "path": "prior.md"}}}, "stale": true}]);
+                        let mut response = json!({"revision": "a".repeat(40), "query": input, "requestedRevision": url.query_pairs().find(|(key, _)| key == "revision").map(|(_, value)| value.into_owned()), "nextCursor": "next-page"});
+                        response[if input["op"] == "links" {
+                            "links"
+                        } else {
+                            "results"
+                        }] = entries;
+                        (200, response)
                     } else if path.ends_with("/knowledge/attachment") {
                         let bytes = [0_u8, 1, 255, 0];
                         let name = url

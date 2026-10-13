@@ -152,6 +152,8 @@ local file. It does not sign the browser out.
 ```sh
 cortex knowledge list
 cortex search "pricing approval" --limit 20
+cortex search "margin" --type metric --status stable --tag finance
+cortex knowledge links finance/margin.md --direction incoming --revision <sha>
 cortex read pricing.md --start-line 1 --limit 200
 cortex knowledge grep "approved" --path decisions
 cortex knowledge document ORGANIZATION.md
@@ -167,7 +169,12 @@ Results include revisions, pagination, and source URLs. Pin related reads with `
 Search is lexical. Follow `nextOffset` and `nextLine`, and inspect per-file errors before concluding
 that a result is complete. For grep, carry both `nextOffset` and `nextMatchOffset` when present. The
 service supports Sandbox and storage API retrieval; local development works without a Sandbox
-binding. `knowledge read-many --file ranges.json` accepts up to eight
+binding. Search accepts exact `--type`, `--status`, and `--tag` filters. Keep them unchanged through
+pagination. Results preserve declared metadata and `stale`, which means the declared review date
+passed. Recorded verification is a declaration, not authenticated approval.
+`knowledge links PATH --direction outgoing|incoming` returns readable references or backlinks with
+revision citation URLs. Follow `--cursor` or `--offset` even after an empty page, retaining the
+path, direction, and revision. `knowledge read-many --file ranges.json` accepts up to eight
 `{"path":"file.md","startLine":1,"limit":200}` objects in an array.
 
 Recording invokes the service's writing model, which selects files and commits validated knowledge.

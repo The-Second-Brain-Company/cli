@@ -153,6 +153,7 @@ pub enum KnowledgeCommand {
     Revision,
     Search(Search),
     Grep(Grep),
+    Links(Links),
     Read(Read),
     ReadMany(ReadMany),
     Record(Record),
@@ -181,6 +182,12 @@ pub struct Search {
     pub query: String,
     #[usage(long)]
     pub path: Option<String>,
+    #[usage(long = "type")]
+    pub kind: Option<String>,
+    #[usage(long)]
+    pub status: Option<String>,
+    #[usage(long)]
+    pub tag: Option<String>,
     #[usage(long, default = "0")]
     pub offset: u64,
     #[usage(long, default = "20")]
@@ -190,6 +197,23 @@ pub struct Search {
     #[usage(
         long,
         help = "Opaque nextCursor from the previous page; preserve the query and revision"
+    )]
+    pub cursor: Option<String>,
+}
+#[derive(Args)]
+pub struct Links {
+    pub path: String,
+    #[usage(long, choices("outgoing", "incoming"))]
+    pub direction: String,
+    #[usage(long, default = "0")]
+    pub offset: u64,
+    #[usage(long, default = "25")]
+    pub limit: u64,
+    #[usage(long)]
+    pub revision: Option<String>,
+    #[usage(
+        long,
+        help = "Opaque nextCursor from the previous page; preserve path, direction and revision"
     )]
     pub cursor: Option<String>,
 }

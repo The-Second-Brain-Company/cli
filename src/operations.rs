@@ -360,6 +360,14 @@ impl Context {
             ),
             KnowledgeCommand::Revision => self.get("/knowledge/revision"),
             KnowledgeCommand::Search(options) => self.search(options),
+            KnowledgeCommand::Links(options) => {
+                pagination(options.offset, options.limit)?;
+                let mut input = json!({"op": "links", "path": knowledge_path(&options.path, false)?, "direction": options.direction, "offset": options.offset, "limit": options.limit});
+                if let Some(cursor) = options.cursor {
+                    input["cursor"] = json!(cursor);
+                }
+                self.query(input, options.revision.as_deref())
+            }
             KnowledgeCommand::Grep(options) => {
                 pagination(options.offset, options.limit)?;
                 let mut input = json!({"op": "grep", "pattern": options.pattern, "ignoreCase": !options.case_sensitive, "offset": options.offset, "limit": options.limit});
@@ -445,6 +453,15 @@ impl Context {
         }
         if let Some(path) = options.path {
             input["path"] = json!(knowledge_path(&path, true)?);
+        }
+        for (key, value) in [
+            ("type", options.kind),
+            ("status", options.status),
+            ("tag", options.tag),
+        ] {
+            if let Some(value) = value {
+                input[key] = json!(value);
+            }
         }
         self.query(input, options.revision.as_deref())
     }
@@ -604,8 +621,10 @@ fn add_sources(value: &mut Value, origin: &str, brain: &str) {
                         .append_pair("revision", revision);
                     object.insert("source_url".into(), json!(url.as_str()));
                 }
-                for (_, child) in object.iter_mut() {
-                    visit(child, origin, brain, revision);
+                for key in ["results", "files", "matches", "links"] {
+                    if let Some(child) = object.get_mut(key) {
+                        visit(child, origin, brain, revision);
+                    }
                 }
             }
             Value::Array(values) => {
