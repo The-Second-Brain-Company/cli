@@ -14,9 +14,10 @@ returned cursors and revision without choosing a backend itself.
 
 ## Authentication and authority
 
-Login uses dynamic client registration, browser email sign-in and consent, authorization code with
-S256 PKCE, a random state, issuer verification, and an ephemeral IPv4 loopback callback. Requests
-use the existing account grant with explicit Brain IDs. The OAuth resource remains
+Manual browser login uses dynamic client registration, email sign-in and consent, authorization code
+with S256 PKCE, a random state, issuer verification, and an ephemeral IPv4 loopback callback. CLI
+0.5.0 also supports email-code login entirely in chat, without a browser or listener. Requests use
+the existing account grant with explicit Brain IDs. The OAuth resource remains
 `<origin>/app/api/mcp`: it identifies the existing Cortex authorization audience shared by these
 transports. The CLI is a separately consented, inspectable, revocable connected app.
 
@@ -25,6 +26,32 @@ and capacity controls. It rejects unregistered and retired operations and accept
 credentials. Long waits recheck the grant before returning. Private administration retains its
 existing inspection, revocation, suspension, run cancellation, repository retry, and cleanup paths.
 CLI retrievals appear as `cli` tool observations alongside their HTTP retrieval ledger entries.
+
+Email login requires `--email` and explicit `--approve-scopes`. The setup ceiling is knowledge:read,
+knowledge:write, brains:access, account:manage, and brains:create. The agent discloses these actions
+before requesting the email and preferred name. The code verifies identity and enters only through
+bounded stdin. The CLI privately composes POST session, code acceptance, GET/POST consent, and
+normal PKCE token exchange. It validates origin/discovery, email, client, resource, permissions,
+callback, state, and issuer. It never follows a redirect or prints a challenge, session cookie,
+OAuth code, verifier, or token.
+
+The permission preview uses the public clientName, redirectUri, scopes, and connection-type fields.
+Internal authorization and User records are not part of that HTTP response. The server validates the
+retained client, resource, and PKCE input during consent and exchange.
+
+One tagged pending record per origin stores each successful secret boundary before the next request.
+Existing credentials survive until atomic token replacement. A different pending request requires
+explicit cancellation. `--resume` continues a saved session or authorization; ambiguous token
+exchange requests a fresh OAuth authorization code from retained consent instead of replaying a
+consumed code. The ordinary grant remains visible and revocable in Connected apps. Tokens are saved
+before temporary-session cleanup. Failed cleanup stays pending, including across logout, and resumes
+without repeating consent. Existing sessions can last seven days; offline cancellation cannot
+guarantee immediate server revocation. Explicit cancellation can discard corrupt local pending state
+while reporting remote cleanup as unknown. No submitted email code is persisted.
+
+Email login changes no project selection. Ordinary profile, Brain list/create/use, and whoami
+commands complete chat setup, then invite a fresh chat. A knowledge interview and save are separate
+from installation. Hosted MCP retains client-owned OAuth and does not inherit local credentials.
 
 A local credential lock serializes refresh and login for an origin. HTTP redirects are disabled to
 keep authorization and tokens at the configured origin. HTTP origins are allowed only for localhost;
@@ -70,8 +97,9 @@ keeps credentials and project selections intact.
 The service adapter adds transport aliases for current operations. It adds no role, management
 scope, data store, migration, or public operator API. Browser and MCP results keep their existing
 contracts. WebSocket streaming is intentionally outside this command/response CLI; status and runs
-provide inspection and waiting. Public waitlist signup and email/invitation acceptance stay in the
-browser bootstrap flow. Retired conversations and Virtual operations remain unavailable.
+provide inspection and waiting. Public waitlist and invitation acceptance retain their bootstrap
+contracts. Email-code sign-in is shared by browser and CLI setup. Retired conversations and Virtual
+operations remain unavailable.
 
 The main `repo/` checkout owns all CLI development, testing, builds, and release work under
 `cli/cli`; the sibling `cli` and `skills` repositories are public mirrors for discovery and raw

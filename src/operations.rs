@@ -53,7 +53,12 @@ impl Context {
             Command::Completions(_) => Err(Error::invalid("Completions are handled before service operations")),
             Command::Login(options) => {
                 let mut result = auth::login(&self.api.origin, &options)?;
-                result["selection"] = if options.no_select {
+                if result.get("signed_in").and_then(Value::as_bool) != Some(true) {
+                    return Ok(result);
+                }
+                result["selection"] = if auth::email_login(&options) {
+                    json!({"selected": false, "reason": "email_login"})
+                } else if options.no_select {
                     json!({"selected": false, "reason": "disabled"})
                 } else if self.selected.is_some() {
                     json!({"selected": false, "reason": "brain_override"})

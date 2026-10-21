@@ -17,8 +17,13 @@ login selection, opt-out, existing and concurrent selection preservation, discov
 failures, failed-switch rollback, selection from the current working directory, request identity,
 and one-time secret files. Fixtures contain synthetic identities and knowledge and do not call a
 model or external storage. Compressed-response fixtures cover Brotli and gzip across OAuth login,
-refresh, search results, and service permission errors. Skill installation is tested independently
-through `mise run test-cli-skills` against `repo/cli/skills`.
+refresh, search results, and service permission errors. The email-login tests run start, code,
+resume, and cancel in separate CLI processes. They cover leading zeros, bounded stdin, wrong/expired
+codes, private file modes, exact Origin and cookie routing,
+email/discovery/consent/callback/issuer/scope mismatch rejection, no listener or browser handoff,
+ambiguous exchange, durable tokens before retryable 204/401 cleanup, existing credential
+preservation, and manual-browser login exclusion during a pending intent. Skill installation is
+tested independently through `mise run test-cli-skills` against `repo/cli/skills`.
 
 Installer tests replace development and release fixtures in the same temporary directory, preserve
 the previous executable when a replacement fails validation, and cover existing symlinks and paths
@@ -49,8 +54,10 @@ and match pagination, partial failures, pinned ranges, and the selected Sandbox 
 3. Use `/admin/` to invite a test user if needed. Accept the development invitation link in the
    browser and complete or skip the personal name. Operator login remains separate.
 4. In an evaluation directory, run `cortex --origin http://second-brain.localhost:1355 login`.
-   Complete browser sign-in and consent. Local delivery returns a masked link in the browser; no
-   email is sent.
+   Manual mode uses browser sign-in and consent. To evaluate chat setup, use login --email with
+   --approve-scopes, then pass the local development code privately through login --code-stdin.
+   Local delivery exposes developmentCode only to the requesting verifier; never log it. No email is
+   sent. Use an isolated private CORTEX_HOME and separate processes for start, finish, and resume.
 5. Login selects your only Brain when the directory has no saved selection. Use
    `cortex login --no-select` to opt out. Check `cortex config`; if nothing is selected, run
    `cortex brains list`, then `cortex use <id>`. To create a Brain, get an ID with
@@ -65,9 +72,9 @@ and match pagination, partial failures, pinned ranges, and the selected Sandbox 
 Use a new private directory through `CORTEX_HOME` to isolate CLI credentials during evaluation.
 Commands automatically respect the current directory's `.cortex/config.toml`. Use
 `--project /path/to/project` to target another folder. No global Brain selection is stored.
-`--origin` must match the running service origin exactly. Login listens on `127.0.0.1`; a remote
-browser must be able to reach that loopback callback on the CLI's machine. A network sandbox may
-need permission for the listener and service connection.
+`--origin` must match the running service origin exactly. Manual browser login listens on
+`127.0.0.1`; email login opens neither a browser nor a listener. A network sandbox may need
+permission for the service connection and private credential storage.
 
 ## Public mirror boundary
 

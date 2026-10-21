@@ -14,6 +14,12 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+mod email;
+
+pub fn email_login(options: &Login) -> bool {
+    email::requested(options)
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Credentials {
     origin: String,
@@ -157,6 +163,7 @@ fn read_credentials(origin: &str, path: &std::path::Path) -> Result<Credentials>
 pub fn logout(origin: &str) -> Result<Value> {
     let path = credential_path(origin)?;
     let _guard = config::lock(&path.with_extension("lock"))?;
+    email::cancel(origin, &path, &client(origin)?)?;
     if !path.exists() {
         return Ok(json!({"signed_out": true}));
     }
@@ -175,6 +182,9 @@ pub fn logout(origin: &str) -> Result<Value> {
 }
 
 pub fn login(origin: &str, options: &Login) -> Result<Value> {
+    if email::requested(options) {
+        return email::login(origin, options);
+    }
     if !(1..=1800).contains(&options.timeout) {
         return Err(Error::invalid("Login timeout must be 1-1800 seconds"));
     }
@@ -186,6 +196,7 @@ pub fn login(origin: &str, options: &Login) -> Result<Value> {
     }
     let path = credential_path(origin)?;
     let _guard = config::lock(&path.with_extension("lock"))?;
+    email::require_no_pending(&path)?;
     let client = client(origin)?;
     let discovery = decode(
         client

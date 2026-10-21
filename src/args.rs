@@ -25,9 +25,7 @@ pub struct Cortex {
 
 #[derive(Subcommands)]
 pub enum Command {
-    #[usage(
-        help = "Sign in through the browser and select your only Brain for an unconfigured project"
-    )]
+    #[usage(help = "Sign in with an emailed code for chat setup, or use manual browser consent")]
     Login(Login),
     #[usage(help = "Revoke this CLI connection and delete its local credentials")]
     Logout,
@@ -77,6 +75,31 @@ pub struct Completions {
 
 #[derive(Args)]
 pub struct Login {
+    #[usage(
+        long,
+        help = "Send a sign-in code to this email; requires --approve-scopes"
+    )]
+    pub email: Option<String>,
+    #[usage(
+        long,
+        help = "Explicitly approved permissions for email login, separated by spaces"
+    )]
+    pub approve_scopes: Option<String>,
+    #[usage(
+        long,
+        help = "Read exactly one six-digit email code from stdin; never a command argument"
+    )]
+    pub code_stdin: bool,
+    #[usage(
+        long,
+        help = "Resume a pending email login without exposing private state"
+    )]
+    pub resume: bool,
+    #[usage(
+        long,
+        help = "Cancel pending email login and clean up its temporary session"
+    )]
+    pub cancel: bool,
     #[usage(
         long,
         help = "Skip automatic project selection when the account has exactly one Brain"

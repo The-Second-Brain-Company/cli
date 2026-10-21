@@ -90,9 +90,24 @@ cortex whoami
 cortex search "release decisions"
 ```
 
-Use an ID returned by `brains list`. Login opens email sign-in and browser consent. It requests the
-existing knowledge, Brain, account, and management permissions; the browser shows the consent and
-the server checks your current role on each operation. For read-only use:
+Use an ID returned by `brains list`. For local agent setup use CLI 0.5.0 chat sign-in:
+
+```sh
+cortex login --email person@example.com --approve-scopes "knowledge:read knowledge:write brains:access account:manage brains:create"
+cortex login --code-stdin
+cortex login --resume
+```
+
+Approve the named permissions before starting. Send the emailed six-digit code only through stdin,
+without a code argument or output. The CLI opens no browser or callback listener and keeps all
+protocol credentials private. `--resume` recovers pending state; `--cancel` cancels it while
+preserving installed credentials. Email login does not choose a Brain. Use ordinary profile,
+list/create/use, and whoami commands, then invite a fresh chat to talk about the verified Brain. See
+[architecture](docs/architecture.md) for cleanup and ambiguous-response recovery.
+
+Manual login without email flags opens email sign-in and browser consent. It requests the existing
+knowledge, Brain, account, and management permissions; the browser shows the consent and the server
+checks your current role on each operation. For read-only use:
 
 ```sh
 cortex login --scopes "knowledge:read brains:access"
