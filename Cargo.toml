@@ -1,6 +1,6 @@
 [package]
 name = "cortex-cli"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.98"
 publish = false
@@ -14,6 +14,7 @@ path = "src/main.rs"
 usage = { package = "usage-rs", version = "=6.11.1", features = ["completions"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.149"
+semver = "=1.0.27"
 reqwest = { version = "=0.13.2", default-features = false, features = [
   "blocking",
   "brotli",

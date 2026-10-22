@@ -116,6 +116,32 @@ disabled. Complete Codex and Claude plugins bundle the portable CLI workflow, so
 need no separate global skill. The fallback MCP audience selects one Brain during OAuth consent; CLI
 authentication remains account-wide for per-directory selection.
 
+## CLI release compatibility
+
+`cortex update` runs before origin, project selection, credentials, and API initialization. Its
+unauthenticated download client reads the official stable GitHub release and version-pinned assets.
+It never uses response hints as executable URLs. The command locks the destination directory, checks
+the currently installed version, verifies the platform checksum and candidate version, and
+atomically replaces the executable through a sibling temporary file. Failure preserves the installed
+binary. A current or newer installed version is a successful no-op.
+
+The API's `cli-release.json` declares independent latest and minimum versions. The CLI adapter
+checks its versioned User-Agent before authentication, body parsing, and product dispatch. Missing
+or malformed versions fail with `cli_version_required`; versions below the minimum fail with
+`upgrade_required`. Shared service availability still applies. Authentication routes, browser and
+MCP requests, private administration, and release downloads retain their own boundaries.
+
+CLI responses include latest and minimum version headers. The client validates and collects hints
+before decoding the body, including empty responses, then adds `context.update` without changing the
+requested data or retry identity. Invalid optional metadata does not fail a successful command. No
+command polls releases or installs updates in the background. The explicit update command alone
+checks release metadata.
+
+Publish and verify the compatible binary before deploying a policy that advertises it. The API
+deployment task checks the public stable release, all four platform assets, their checksums, and
+matching release metadata. Operators change the checked-in policy and redeploy to raise a minimum or
+recover from an incorrect minimum. A CLI major version does not automatically raise the minimum.
+
 ## Naming compatibility
 
 Cortex reads legacy `.brain/config.toml` selections with `brain_id` when no `.cortex` selection

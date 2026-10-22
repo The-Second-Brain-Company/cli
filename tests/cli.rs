@@ -19,6 +19,129 @@ const SECOND: &str = "org_2222222222222222";
 const RUN: &str = "run_1111111111111111";
 
 #[test]
+fn ordinary_and_empty_api_responses_surface_passive_updates_without_extra_requests() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    {
+        let mut state = fixture.state.lock().unwrap();
+        state.requests.clear();
+        state.update_headers = vec![
+            ("Cortex-CLI-Latest-Version", "1.2.0"),
+            ("Cortex-CLI-Minimum-Version", "0.5.0"),
+        ];
+    }
+    let (code, result) = fixture.run(&["search", "pricing"]);
+    assert_eq!(code, 0, "{result}");
+    assert_eq!(result["context"]["brain_id"], FIRST);
+    assert_eq!(
+        result["context"]["update"],
+        json!({"currentVersion": env!("CARGO_PKG_VERSION"), "latestVersion":"1.2.0", "minimumVersion":"0.5.0", "command":"cortex update"})
+    );
+    assert_eq!(fixture.state.lock().unwrap().requests.len(), 1);
+    {
+        let mut state = fixture.state.lock().unwrap();
+        state.cli_no_content = true;
+        state.requests.clear();
+    }
+    let (code, result) = fixture.run(&["account", "disconnect", "ogr_1111111111111111"]);
+    assert_eq!(code, 0, "{result}");
+    assert_eq!(result["data"]["completed"], true);
+    assert_eq!(result["context"]["update"]["latestVersion"], "1.2.0");
+    assert_eq!(fixture.state.lock().unwrap().requests.len(), 1);
+}
+
+#[test]
+fn malformed_missing_or_inconsistent_update_headers_do_not_fail_operations() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    for headers in [
+        vec![],
+        vec![("Cortex-CLI-Latest-Version", "1.2.0")],
+        vec![
+            ("Cortex-CLI-Latest-Version", "invalid"),
+            ("Cortex-CLI-Minimum-Version", "0.5.0"),
+        ],
+        vec![
+            ("Cortex-CLI-Latest-Version", "0.6.0"),
+            ("Cortex-CLI-Minimum-Version", "1.0.0"),
+        ],
+        vec![
+            ("Cortex-CLI-Latest-Version", "1.2.0"),
+            ("Cortex-CLI-Minimum-Version", "invalid"),
+        ],
+        vec![
+            ("Cortex-CLI-Latest-Version", "0.6.0"),
+            ("Cortex-CLI-Minimum-Version", "0.5.0"),
+        ],
+    ] {
+        fixture.state.lock().unwrap().update_headers = headers;
+        let (code, result) = fixture.run(&["search", "pricing"]);
+        assert_eq!(code, 0, "{result}");
+        assert!(result["context"].get("update").is_none(), "{result}");
+    }
+}
+
+#[test]
+fn required_updates_preserve_error_retry_and_brain_context_without_retrying_the_write() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    {
+        let mut state = fixture.state.lock().unwrap();
+        state.requests.clear();
+        state.cli_error = Some((400, "upgrade_required"));
+        state.update_headers = vec![
+            ("Cortex-CLI-Latest-Version", "1.2.0"),
+            ("Cortex-CLI-Minimum-Version", "1.0.0"),
+        ];
+    }
+    let (code, result) = fixture.run(&[
+        "record",
+        "--text",
+        "Original facts",
+        "--request-id",
+        "original-retry",
+    ]);
+    assert_eq!(code, 1, "{result}");
+    assert_eq!(result["error"]["code"], "upgrade_required");
+    assert_eq!(result["error"]["status"], 400);
+    assert!(
+        result["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("cortex update")
+    );
+    assert_eq!(
+        result["error"]["details"]["context"]["request_id"],
+        "original-retry"
+    );
+    assert_eq!(result["error"]["details"]["context"]["brain_id"], FIRST);
+    assert_eq!(
+        result["error"]["details"]["context"]["update"]["minimumVersion"],
+        "1.0.0"
+    );
+    let state = fixture.state.lock().unwrap();
+    assert_eq!(state.requests.len(), 1);
+    assert_eq!(state.requests[0].2["requestId"], "original-retry");
+}
+
+#[test]
+fn only_explicit_update_error_codes_on_the_expected_status_are_recognized() {
+    let fixture = Fixture::new();
+    fixture.login(&[]);
+    for (status, remote_code, expected) in [
+        (400, "cli_version_required", "cli_version_required"),
+        (400, "arbitrary_code", "service"),
+        (403, "upgrade_required", "permission_denied"),
+        (500, "cli_version_required", "service"),
+    ] {
+        fixture.state.lock().unwrap().cli_error = Some((status, remote_code));
+        let (code, result) = fixture.run(&["search", "pricing"]);
+        assert_ne!(code, 0);
+        assert_eq!(result["error"]["code"], expected);
+    }
+}
+
+#[test]
 fn review_preserves_both_revisions_and_rejects_invalid_revision_before_network() {
     let fixture = Fixture::new();
     fixture.login(&[]);
@@ -249,6 +372,9 @@ struct State {
     wait_fails: bool,
     revoked: bool,
     response_encoding: Option<&'static str>,
+    update_headers: Vec<(&'static str, &'static str)>,
+    cli_error: Option<(u16, &'static str)>,
+    cli_no_content: bool,
 }
 struct Fixture {
     origin: String,
@@ -323,7 +449,19 @@ impl Fixture {
                             .any(|header| header.field.equiv("Authorization")
                                 && header.value.as_str() == "Bearer synthetic-access-token")
                     );
-                    if path.ends_with("/membership") {
+                    assert!(request.headers().iter().any(
+                        |header| header.field.equiv("User-Agent")
+                            && header.value.as_str()
+                                == concat!("cortex-cli/", env!("CARGO_PKG_VERSION"))
+                    ));
+                    if let Some((status, code)) = state.cli_error {
+                        (
+                            status,
+                            json!({"code": code, "error": "Update Cortex with cortex update before retrying the original operation."}),
+                        )
+                    } else if state.cli_no_content {
+                        (204, Value::Null)
+                    } else if path.ends_with("/membership") {
                         state.verification_count += 1;
                         if state.deny_membership
                             || (state.fail_verification
@@ -461,6 +599,11 @@ impl Fixture {
                     response.add_header(
                         tiny_http::Header::from_bytes("Content-Encoding", encoding).unwrap(),
                     );
+                }
+                if path.starts_with("/app/api/cli/") {
+                    for (name, value) in &state.update_headers {
+                        response.add_header(tiny_http::Header::from_bytes(*name, *value).unwrap());
+                    }
                 }
                 request.respond(response).unwrap();
             }

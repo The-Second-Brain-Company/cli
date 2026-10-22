@@ -25,6 +25,8 @@ pub struct Cortex {
 
 #[derive(Subcommands)]
 pub enum Command {
+    #[usage(help = "Install the latest official stable CLI release")]
+    Update,
     #[usage(help = "Sign in with an emailed code for chat setup, or use manual browser consent")]
     Login(Login),
     #[usage(help = "Revoke this CLI connection and delete its local credentials")]

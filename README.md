@@ -41,6 +41,28 @@ Saving the installer and running `bash install.sh` or `bash install.sh --release
 behavior. Complete plugins install a missing compatible CLI on first use; no separate skill or
 customer AGENTS.md edit is needed.
 
+## Update the CLI
+
+Run an explicit update from any directory:
+
+```sh
+cortex update
+```
+
+The command downloads the latest stable official release and replaces the executable you ran. It
+verifies SHA-256 and the replacement's version before an atomic rename. It preserves credentials and
+Brain selections, refuses downgrades, and returns `status: "current"` when no newer version exists.
+Updating requires write access to the executable's directory. It needs no sign-in, valid project
+configuration, or working product API. The installer remains available for first installation and
+recovery. Releases before 0.6.0 require the installer to gain this command.
+
+Ordinary API requests identify the CLI through `User-Agent: cortex-cli/<version>`. Responses carry
+`Cortex-CLI-Latest-Version` and `Cortex-CLI-Minimum-Version`. A newer available release appears in
+`context.update`; an unsupported version fails with `upgrade_required` before the service executes
+the operation. Optional notices do not change the operation's result. There is no polling or
+background updater. After updating, resume an interrupted task with its original Brain, input, and
+retry ID.
+
 ## Quick start
 
 Do all development in the main `repo/` checkout. This public CLI repository is a mirror for

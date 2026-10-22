@@ -4,12 +4,20 @@ mod auth;
 mod config;
 mod error;
 mod operations;
+mod update;
 
 use args::{Command, Cortex};
 use error::{Error, Result};
 use serde_json::{Value, json};
 
 fn run(args: Cortex) -> Result<Value> {
+    run_with_update(args, update::run)
+}
+
+fn run_with_update(args: Cortex, update: impl FnOnce() -> Result<Value>) -> Result<Value> {
+    if matches!(args.command, Command::Update) {
+        return Ok(json!({"ok": true, "data": update()?}));
+    }
     let origin = config::origin(
         &args
             .origin
@@ -52,8 +60,11 @@ fn run(args: Cortex) -> Result<Value> {
         selected,
     };
     let result = context.execute(args.command);
-    let metadata =
+    let mut metadata =
         json!({"origin": origin, "brain_id": context.selected, "request_id": request_id});
+    if let Some(update) = context.api.update_hint() {
+        metadata["update"] = json!(update);
+    }
     match result {
         Ok(data) => {
             let status = data.get("status").and_then(Value::as_str);
@@ -120,4 +131,35 @@ fn main() {
         encoded.unwrap_or_else(|_| "{\"ok\":false,\"error\":{\"code\":\"encoding\"}}".into())
     );
     std::process::exit(exit);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_runs_before_origin_project_brain_or_credentials_are_loaded() {
+        let words = [
+            "--origin",
+            "invalid",
+            "--project",
+            "/missing-cortex-project",
+            "--brain",
+            "invalid",
+            "update",
+        ]
+        .into_iter()
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
+        let usage::embedded::Outcome::Parsed(args) = Cortex::embedded_outcome(&words) else {
+            panic!("update must parse without requiring project or authentication");
+        };
+        let result = run_with_update(args, || {
+            Ok(json!({"status": "current", "version": "0.6.0"}))
+        })
+        .unwrap();
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["data"]["status"], "current");
+        assert!(result.get("context").is_none());
+    }
 }

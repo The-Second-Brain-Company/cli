@@ -50,6 +50,7 @@ impl Context {
     }
     pub fn execute(&mut self, command: Command) -> Result<Value> {
         match command {
+            Command::Update => Err(Error::invalid("Updates are handled before service operations")),
             Command::Completions(_) => Err(Error::invalid("Completions are handled before service operations")),
             Command::Login(options) => {
                 let mut result = auth::login(&self.api.origin, &options)?;

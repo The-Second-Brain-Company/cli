@@ -71,6 +71,14 @@ pub fn decode(response: reqwest::blocking::Response) -> Result<Value> {
     })?;
     if !(200..300).contains(&status) {
         let code = match status {
+            400 => match (
+                value.get("code").and_then(Value::as_str),
+                value.get("error").and_then(Value::as_str),
+            ) {
+                (Some("upgrade_required"), Some(_)) => "upgrade_required",
+                (Some("cli_version_required"), Some(_)) => "cli_version_required",
+                _ => "service",
+            },
             401 => "authentication",
             403 => "permission_denied",
             409 => "conflict",
